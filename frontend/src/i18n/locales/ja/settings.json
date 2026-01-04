@@ -370,6 +370,51 @@
         "unsavedChanges": "• 未保存の変更があります",
         "discard": "破棄",
         "confirmSwitch": "未保存の変更があります。本当にプロジェクトを切り替えますか？変更は失われます。"
+      },
+      "githubIntegration": {
+        "title": "GitHub連携",
+        "description": "GitHubからイシューをインポートし、新しいイシューを自動的にタスクとして同期",
+        "repoUrl": {
+          "label": "リポジトリURL",
+          "placeholder": "owner/repo または https://github.com/owner/repo",
+          "helper": "owner/repo形式でGitHubリポジトリを入力"
+        },
+        "token": {
+          "label": "個人アクセストークン",
+          "placeholder": "ghp_xxxxxxxxxxxx",
+          "placeholderExisting": "既存のトークンを置き換えるには新しいトークンを入力",
+          "saved": "(保存済み)",
+          "helper": "\"repo\"スコープでトークンを作成",
+          "show": "表示",
+          "hide": "非表示",
+          "settingsLink": "GitHub設定"
+        },
+        "syncLabels": {
+          "label": "ラベルでフィルタ（オプション）",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "イシューをフィルタするためのカンマ区切りのラベルリスト"
+        },
+        "autoSync": {
+          "label": "自動同期を有効にする",
+          "helper": "フィルタラベルに一致する新しいイシューを自動的にインポート"
+        },
+        "buttons": {
+          "loadIssues": "イシューを読み込む",
+          "syncNow": "今すぐ同期",
+          "save": "GitHub設定を保存",
+          "import": "インポート"
+        },
+        "issues": {
+          "title": "オープンイシュー",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitHub設定が正常に保存されました",
+          "configureFirst": "まずGitHubリポジトリURLとトークンを設定してください",
+          "loadError": "GitHubイシューの読み込みに失敗しました",
+          "importError": "イシューのインポートに失敗しました",
+          "syncError": "イシューの同期に失敗しました"
+        }
       }
     }
   },

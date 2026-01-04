@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
-use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
+use schemars::{generate::SchemaSettings, JsonSchema, Schema, SchemaGenerator};
 use server::routes::task_attempts::pr::DEFAULT_PR_DESCRIPTION_PROMPT;
 use ts_rs::TS;
 
@@ -137,6 +137,15 @@ fn generate_types_content() -> String {
         server::routes::task_attempts::pr::GetPrCommentsError::decl(),
         server::routes::task_attempts::pr::GetPrCommentsQuery::decl(),
         services::services::github::UnifiedPrComment::decl(),
+        services::services::github_issues::GitHubIssue::decl(),
+        services::services::github_issues::GitHubUser::decl(),
+        services::services::github_issues::GitHubLabel::decl(),
+        services::services::github_issues::GitHubMilestone::decl(),
+        services::services::github_issues::ListIssuesParams::decl(),
+        server::routes::github_issues::GitHubIssuesResponse::decl(),
+        server::routes::github_issues::ImportIssueRequest::decl(),
+        server::routes::github_issues::ImportIssueResponse::decl(),
+        server::routes::github_issues::GitHubConfigStatus::decl(),
         server::routes::task_attempts::RepoBranchStatus::decl(),
         services::services::filesystem::DirectoryEntry::decl(),
         services::services::filesystem::DirectoryListResponse::decl(),

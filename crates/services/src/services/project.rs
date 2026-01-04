@@ -132,6 +132,10 @@ impl ProjectService {
                     dev_script: None,
                     dev_script_working_dir: None,
                     default_agent_working_dir: Some(repo.name),
+                    github_repo_url: None,
+                    github_token: None,
+                    github_sync_enabled: None,
+                    github_sync_labels: None,
                 },
             )
             .await?;

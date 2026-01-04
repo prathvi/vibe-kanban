@@ -370,6 +370,51 @@
         "unsavedChanges": "• 저장되지 않은 변경사항이 있습니다",
         "discard": "취소",
         "confirmSwitch": "저장되지 않은 변경사항이 있습니다. 정말 프로젝트를 전환하시겠습니까? 변경사항이 손실됩니다."
+      },
+      "githubIntegration": {
+        "title": "GitHub 연동",
+        "description": "GitHub에서 이슈를 가져오고 새 이슈를 자동으로 태스크로 동기화",
+        "repoUrl": {
+          "label": "리포지토리 URL",
+          "placeholder": "owner/repo 또는 https://github.com/owner/repo",
+          "helper": "owner/repo 형식으로 GitHub 리포지토리를 입력하세요"
+        },
+        "token": {
+          "label": "개인 액세스 토큰",
+          "placeholder": "ghp_xxxxxxxxxxxx",
+          "placeholderExisting": "기존 토큰을 교체하려면 새 토큰을 입력하세요",
+          "saved": "(저장됨)",
+          "helper": "\"repo\" 스코프로 토큰을 생성하세요",
+          "show": "표시",
+          "hide": "숨기기",
+          "settingsLink": "GitHub 설정"
+        },
+        "syncLabels": {
+          "label": "레이블로 필터 (선택사항)",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "이슈를 필터링할 쉼표로 구분된 레이블 목록"
+        },
+        "autoSync": {
+          "label": "자동 동기화 활성화",
+          "helper": "필터 레이블과 일치하는 새 이슈를 자동으로 가져오기"
+        },
+        "buttons": {
+          "loadIssues": "이슈 불러오기",
+          "syncNow": "지금 동기화",
+          "save": "GitHub 설정 저장",
+          "import": "가져오기"
+        },
+        "issues": {
+          "title": "오픈 이슈",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitHub 설정이 성공적으로 저장되었습니다",
+          "configureFirst": "먼저 GitHub 리포지토리 URL과 토큰을 설정해주세요",
+          "loadError": "GitHub 이슈 불러오기에 실패했습니다",
+          "importError": "이슈 가져오기에 실패했습니다",
+          "syncError": "이슈 동기화에 실패했습니다"
+        }
       }
     }
   },

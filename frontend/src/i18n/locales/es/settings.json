@@ -370,6 +370,51 @@
         "unsavedChanges": "• Tienes cambios sin guardar",
         "discard": "Descartar",
         "confirmSwitch": "Tienes cambios sin guardar. ¿Estás seguro de que quieres cambiar de proyecto? Tus cambios se perderán."
+      },
+      "githubIntegration": {
+        "title": "Integración de GitHub",
+        "description": "Importar issues desde GitHub y sincronizar automáticamente nuevos issues como tareas",
+        "repoUrl": {
+          "label": "URL del Repositorio",
+          "placeholder": "propietario/repo o https://github.com/propietario/repo",
+          "helper": "Ingresa el repositorio de GitHub en formato propietario/repo"
+        },
+        "token": {
+          "label": "Token de Acceso Personal",
+          "placeholder": "ghp_xxxxxxxxxxxx",
+          "placeholderExisting": "Ingresa un nuevo token para reemplazar el existente",
+          "saved": "(guardado)",
+          "helper": "Crea un token con el alcance \"repo\"",
+          "show": "Mostrar",
+          "hide": "Ocultar",
+          "settingsLink": "Configuración de GitHub"
+        },
+        "syncLabels": {
+          "label": "Filtrar por Etiquetas (opcional)",
+          "placeholder": "bug, mejora, se necesita ayuda",
+          "helper": "Lista de etiquetas separadas por comas para filtrar issues"
+        },
+        "autoSync": {
+          "label": "Habilitar sincronización automática",
+          "helper": "Importar automáticamente nuevos issues que coincidan con las etiquetas de filtro"
+        },
+        "buttons": {
+          "loadIssues": "Cargar Issues",
+          "syncNow": "Sincronizar Ahora",
+          "save": "Guardar Configuración de GitHub",
+          "import": "Importar"
+        },
+        "issues": {
+          "title": "Issues Abiertos",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "Configuración de GitHub guardada exitosamente",
+          "configureFirst": "Por favor configura primero la URL del repositorio y el token de GitHub",
+          "loadError": "Error al cargar los issues de GitHub",
+          "importError": "Error al importar el issue",
+          "syncError": "Error al sincronizar los issues"
+        }
       }
     }
   },

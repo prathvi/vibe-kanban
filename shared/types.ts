@@ -12,11 +12,11 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, github_repo_url: string | null, github_sync_enabled: boolean, github_sync_labels: string | null, github_last_sync_at: string | null, created_at: Date, updated_at: Date, };
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
-export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, };
+export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, github_repo_url: string | null, github_token: string | null, github_sync_enabled: boolean | null, github_sync_labels: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
 
@@ -285,6 +285,24 @@ export type GetPrCommentsError = { "type": "no_pr_attached" } | { "type": "githu
 export type GetPrCommentsQuery = { repo_id: string, };
 
 export type UnifiedPrComment = { "comment_type": "general", id: string, author: string, author_association: string, body: string, created_at: string, url: string, } | { "comment_type": "review", id: bigint, author: string, author_association: string, body: string, created_at: string, url: string, path: string, line: bigint | null, diff_hunk: string, };
+
+export type GitHubIssue = { number: bigint, title: string, body: string | null, state: string, html_url: string, user: GitHubUser, labels: Array<GitHubLabel>, created_at: string, updated_at: string, assignees: Array<GitHubUser>, milestone: GitHubMilestone | null, };
+
+export type GitHubUser = { login: string, avatar_url: string, };
+
+export type GitHubLabel = { name: string, color: string, };
+
+export type GitHubMilestone = { title: string, number: bigint, };
+
+export type ListIssuesParams = { state: string | null, labels: string | null, sort: string | null, direction: string | null, per_page: number | null, page: number | null, };
+
+export type GitHubIssuesResponse = { issues: Array<GitHubIssue>, has_github_config: boolean, };
+
+export type ImportIssueRequest = { issue_number: bigint, auto_start: boolean | null, };
+
+export type ImportIssueResponse = { task: Task, issue: GitHubIssue, };
+
+export type GitHubConfigStatus = { has_repo_url: boolean, has_token: boolean, repo_url: string | null, sync_enabled: boolean, sync_labels: string | null, };
 
 export type RepoBranchStatus = { repo_id: string, repo_name: string, commits_behind: number | null, commits_ahead: number | null, has_uncommitted_changes: boolean | null, head_oid: string | null, uncommitted_count: number | null, untracked_count: number | null, target_branch_name: string, remote_commits_behind: number | null, remote_commits_ahead: number | null, merges: Array<Merge>, 
 /**

@@ -93,6 +93,38 @@ import {
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
 
+export interface GitHubConfigStatus {
+  has_repo_url: boolean;
+  has_token: boolean;
+  repo_url: string | null;
+  sync_enabled: boolean;
+  sync_labels: string | null;
+}
+
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  html_url: string;
+  user: { login: string; avatar_url: string };
+  labels: { name: string; color: string }[];
+  created_at: string;
+  updated_at: string;
+  assignees: { login: string; avatar_url: string }[];
+  milestone: { title: string; number: number } | null;
+}
+
+export interface GitHubIssuesResponse {
+  issues: GitHubIssue[];
+  has_github_config: boolean;
+}
+
+export interface ImportIssueResponse {
+  task: Task;
+  issue: GitHubIssue;
+}
+
 export class ApiError<E = unknown> extends Error {
   public status?: number;
   public error_data?: E;
@@ -382,6 +414,53 @@ export const projectsApi = {
       }
     );
     return handleApiResponse<ProjectRepo>(response);
+  },
+
+  getGitHubConfig: async (projectId: string): Promise<GitHubConfigStatus> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/github/config`
+    );
+    return handleApiResponse<GitHubConfigStatus>(response);
+  },
+
+  listGitHubIssues: async (
+    projectId: string,
+    params?: { state?: string; labels?: string; page?: number; per_page?: number }
+  ): Promise<GitHubIssuesResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.state) searchParams.append('state', params.state);
+    if (params?.labels) searchParams.append('labels', params.labels);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+    const query = searchParams.toString();
+    const response = await makeRequest(
+      `/api/projects/${projectId}/github/issues${query ? `?${query}` : ''}`
+    );
+    return handleApiResponse<GitHubIssuesResponse>(response);
+  },
+
+  importGitHubIssue: async (
+    projectId: string,
+    issueNumber: number
+  ): Promise<ImportIssueResponse> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/github/issues/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ issue_number: issueNumber }),
+      }
+    );
+    return handleApiResponse<ImportIssueResponse>(response);
+  },
+
+  syncGitHubIssues: async (projectId: string): Promise<ImportIssueResponse[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/github/issues/sync`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<ImportIssueResponse[]>(response);
   },
 };
 

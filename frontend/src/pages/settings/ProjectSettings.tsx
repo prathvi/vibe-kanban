@@ -21,15 +21,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trash2, Github, RefreshCw, ExternalLink } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { CopyFilesField } from '@/components/projects/CopyFilesField';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, GitHubIssue } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, ProjectRepo, Repo, UpdateProject } from 'shared/types';
 
@@ -45,6 +46,13 @@ interface RepoScriptsFormState {
   parallel_setup_script: boolean;
   cleanup_script: string;
   copy_files: string;
+}
+
+interface GitHubFormState {
+  github_repo_url: string;
+  github_token: string;
+  github_sync_enabled: boolean;
+  github_sync_labels: string;
 }
 
 function projectToFormState(project: Project): ProjectFormState {
@@ -112,6 +120,22 @@ export function ProjectSettings() {
   const [savingScripts, setSavingScripts] = useState(false);
   const [scriptsSuccess, setScriptsSuccess] = useState(false);
   const [scriptsError, setScriptsError] = useState<string | null>(null);
+
+  // GitHub integration state
+  const [githubDraft, setGithubDraft] = useState<GitHubFormState>({
+    github_repo_url: '',
+    github_token: '',
+    github_sync_enabled: false,
+    github_sync_labels: '',
+  });
+  const [savingGithub, setSavingGithub] = useState(false);
+  const [githubSuccess, setGithubSuccess] = useState(false);
+  const [githubError, setGithubError] = useState<string | null>(null);
+  const [githubIssues, setGithubIssues] = useState<GitHubIssue[]>([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [syncingIssues, setSyncingIssues] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [hasExistingToken, setHasExistingToken] = useState(false);
 
   // Get OS-appropriate script placeholders
   const placeholders = useScriptPlaceholders();
@@ -270,7 +294,6 @@ export function ProjectSettings() {
     }
   }, [repositories, selectedScriptsRepoId]);
 
-  // Reset scripts selection when project changes
   useEffect(() => {
     setSelectedScriptsRepoId(null);
     setSelectedProjectRepo(null);
@@ -278,7 +301,35 @@ export function ProjectSettings() {
     setScriptsError(null);
   }, [selectedProjectId]);
 
-  // Fetch ProjectRepo scripts when selected scripts repo changes
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setGithubDraft({
+        github_repo_url: '',
+        github_token: '',
+        github_sync_enabled: false,
+        github_sync_labels: '',
+      });
+      setGithubIssues([]);
+      setHasExistingToken(false);
+      return;
+    }
+
+    projectsApi
+      .getGitHubConfig(selectedProjectId)
+      .then((config) => {
+        setGithubDraft({
+          github_repo_url: config.repo_url ?? '',
+          github_token: '',
+          github_sync_enabled: config.sync_enabled,
+          github_sync_labels: config.sync_labels ?? '',
+        });
+        setHasExistingToken(config.has_token);
+      })
+      .catch(() => {
+        setHasExistingToken(false);
+      });
+  }, [selectedProjectId]);
+
   useEffect(() => {
     if (!selectedProjectId || !selectedScriptsRepoId) {
       setSelectedProjectRepo(null);
@@ -397,6 +448,10 @@ export function ProjectSettings() {
         dev_script_working_dir: draft.dev_script_working_dir.trim() || null,
         default_agent_working_dir:
           draft.default_agent_working_dir.trim() || null,
+        github_repo_url: null,
+        github_token: null,
+        github_sync_enabled: null,
+        github_sync_labels: null,
       };
 
       updateProject.mutate({
@@ -463,6 +518,103 @@ export function ProjectSettings() {
       if (!prev) return prev;
       return { ...prev, ...updates };
     });
+  };
+
+  const updateGithubDraft = (updates: Partial<GitHubFormState>) => {
+    setGithubDraft((prev) => ({ ...prev, ...updates }));
+  };
+
+  const handleSaveGithub = async () => {
+    if (!selectedProject) return;
+
+    setSavingGithub(true);
+    setGithubError(null);
+    setGithubSuccess(false);
+
+    try {
+      const updateData: UpdateProject = {
+        name: selectedProject.name,
+        dev_script: selectedProject.dev_script ?? null,
+        dev_script_working_dir: selectedProject.dev_script_working_dir ?? null,
+        default_agent_working_dir: selectedProject.default_agent_working_dir ?? null,
+        github_repo_url: githubDraft.github_repo_url.trim() || null,
+        github_token: githubDraft.github_token.trim() || null,
+        github_sync_enabled: githubDraft.github_sync_enabled,
+        github_sync_labels: githubDraft.github_sync_labels.trim() || null,
+      };
+
+      await projectsApi.update(selectedProject.id, updateData);
+      setGithubSuccess(true);
+      if (githubDraft.github_token.trim()) {
+        setHasExistingToken(true);
+      }
+      setGithubDraft((prev) => ({ ...prev, github_token: '' }));
+      setTimeout(() => setGithubSuccess(false), 3000);
+    } catch (err) {
+      setGithubError(
+        err instanceof Error ? err.message : 'Failed to save GitHub settings'
+      );
+    } finally {
+      setSavingGithub(false);
+    }
+  };
+
+  const handleLoadIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setLoadingIssues(true);
+    setGithubError(null);
+
+    try {
+      const response = await projectsApi.listGitHubIssues(selectedProjectId);
+      if (!response.has_github_config) {
+        setGithubError(t('settings.projects.githubIntegration.messages.configureFirst'));
+        setGithubIssues([]);
+      } else {
+        setGithubIssues(response.issues);
+      }
+    } catch (err) {
+      setGithubError(
+        err instanceof Error ? err.message : t('settings.projects.githubIntegration.messages.loadError')
+      );
+    } finally {
+      setLoadingIssues(false);
+    }
+  };
+
+  const handleImportIssue = async (issueNumber: number) => {
+    if (!selectedProjectId) return;
+
+    try {
+      await projectsApi.importGitHubIssue(selectedProjectId, issueNumber);
+      setGithubIssues((prev) => prev.filter((i) => i.number !== issueNumber));
+    } catch (err) {
+      setGithubError(
+        err instanceof Error ? err.message : t('settings.projects.githubIntegration.messages.importError')
+      );
+    }
+  };
+
+  const handleSyncIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setSyncingIssues(true);
+    setGithubError(null);
+
+    try {
+      const imported = await projectsApi.syncGitHubIssues(selectedProjectId);
+      if (imported.length > 0) {
+        setGithubSuccess(true);
+        setTimeout(() => setGithubSuccess(false), 3000);
+      }
+      await handleLoadIssues();
+    } catch (err) {
+      setGithubError(
+        err instanceof Error ? err.message : t('settings.projects.githubIntegration.messages.syncError')
+      );
+    } finally {
+      setSyncingIssues(false);
+    }
   };
 
   if (projectsLoading) {
@@ -930,7 +1082,219 @@ export function ProjectSettings() {
             </CardContent>
           </Card>
 
-          {/* Sticky Save Button for Project Name */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Github className="h-5 w-5" />
+                {t('settings.projects.githubIntegration.title')}
+              </CardTitle>
+              <CardDescription>
+                {t('settings.projects.githubIntegration.description')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {githubError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{githubError}</AlertDescription>
+                </Alert>
+              )}
+
+              {githubSuccess && (
+                <Alert variant="success">
+                  <AlertDescription className="font-medium">
+                    {t('settings.projects.githubIntegration.messages.success')}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="github-repo-url">
+                  {t('settings.projects.githubIntegration.repoUrl.label')}
+                </Label>
+                <Input
+                  id="github-repo-url"
+                  value={githubDraft.github_repo_url}
+                  onChange={(e) =>
+                    updateGithubDraft({ github_repo_url: e.target.value })
+                  }
+                  placeholder={t('settings.projects.githubIntegration.repoUrl.placeholder')}
+                  className="font-mono"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.githubIntegration.repoUrl.helper')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="github-token">
+                    {t('settings.projects.githubIntegration.token.label')}
+                  </Label>
+                  {hasExistingToken && !githubDraft.github_token && (
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      {t('settings.projects.githubIntegration.token.saved')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="github-token"
+                    type={showToken ? 'text' : 'password'}
+                    value={githubDraft.github_token}
+                    onChange={(e) =>
+                      updateGithubDraft({ github_token: e.target.value })
+                    }
+                    placeholder={
+                      hasExistingToken
+                        ? t('settings.projects.githubIntegration.token.placeholderExisting')
+                        : t('settings.projects.githubIntegration.token.placeholder')
+                    }
+                    className="font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowToken(!showToken)}
+                  >
+                    {showToken
+                      ? t('settings.projects.githubIntegration.token.hide')
+                      : t('settings.projects.githubIntegration.token.show')}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.githubIntegration.token.helper')}{' '}
+                  <a
+                    href="https://github.com/settings/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('settings.projects.githubIntegration.token.settingsLink')}
+                    <ExternalLink className="inline h-3 w-3 ml-1" />
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="github-sync-labels">
+                  {t('settings.projects.githubIntegration.syncLabels.label')}
+                </Label>
+                <Input
+                  id="github-sync-labels"
+                  value={githubDraft.github_sync_labels}
+                  onChange={(e) =>
+                    updateGithubDraft({ github_sync_labels: e.target.value })
+                  }
+                  placeholder={t('settings.projects.githubIntegration.syncLabels.placeholder')}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.githubIntegration.syncLabels.helper')}
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="github-sync-enabled"
+                  checked={githubDraft.github_sync_enabled}
+                  onCheckedChange={(checked) =>
+                    updateGithubDraft({ github_sync_enabled: checked })
+                  }
+                />
+                <Label htmlFor="github-sync-enabled" className="cursor-pointer">
+                  {t('settings.projects.githubIntegration.autoSync.label')}
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.projects.githubIntegration.autoSync.helper')}
+              </p>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadIssues}
+                    disabled={loadingIssues || !githubDraft.github_repo_url}
+                  >
+                    {loadingIssues && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {t('settings.projects.githubIntegration.buttons.loadIssues')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncIssues}
+                    disabled={syncingIssues || !githubDraft.github_repo_url}
+                  >
+                    {syncingIssues ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    {t('settings.projects.githubIntegration.buttons.syncNow')}
+                  </Button>
+                </div>
+                <Button
+                  onClick={handleSaveGithub}
+                  disabled={savingGithub}
+                >
+                  {savingGithub && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {t('settings.projects.githubIntegration.buttons.save')}
+                </Button>
+              </div>
+
+              {githubIssues.length > 0 && (
+                <div className="pt-4 border-t">
+                  <Label className="mb-3 block">
+                    {t('settings.projects.githubIntegration.issues.title')} ({githubIssues.length})
+                  </Label>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {githubIssues.map((issue) => (
+                      <div
+                        key={issue.number}
+                        className="flex items-center justify-between p-3 border rounded-md"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">
+                            #{issue.number} {issue.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{issue.user.login}</span>
+                            {issue.labels.length > 0 && (
+                              <div className="flex gap-1">
+                                {issue.labels.slice(0, 3).map((label) => (
+                                  <span
+                                    key={label.name}
+                                    className="px-1.5 py-0.5 text-xs rounded"
+                                    style={{
+                                      backgroundColor: `#${label.color}20`,
+                                      color: `#${label.color}`,
+                                    }}
+                                  >
+                                    {label.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImportIssue(issue.number)}
+                        >
+                          {t('settings.projects.githubIntegration.buttons.import')}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {hasUnsavedProjectChanges && (
             <div className="sticky bottom-0 z-10 bg-background/80 backdrop-blur-sm border-t py-4">
               <div className="flex items-center justify-between">

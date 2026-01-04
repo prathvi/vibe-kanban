@@ -370,6 +370,51 @@
         "unsavedChanges": "• You have unsaved changes",
         "discard": "Discard",
         "confirmSwitch": "You have unsaved changes. Are you sure you want to switch projects? Your changes will be lost."
+      },
+      "githubIntegration": {
+        "title": "GitHub Integration",
+        "description": "Import issues from GitHub and auto-sync new issues as tasks",
+        "repoUrl": {
+          "label": "Repository URL",
+          "placeholder": "owner/repo or https://github.com/owner/repo",
+          "helper": "Enter the GitHub repository in owner/repo format"
+        },
+        "token": {
+          "label": "Personal Access Token",
+          "placeholder": "ghp_xxxxxxxxxxxx",
+          "placeholderExisting": "Enter new token to replace existing",
+          "saved": "(saved)",
+          "helper": "Create a token with \"repo\" scope",
+          "show": "Show",
+          "hide": "Hide",
+          "settingsLink": "GitHub Settings"
+        },
+        "syncLabels": {
+          "label": "Filter by Labels (optional)",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "Comma-separated list of labels to filter issues"
+        },
+        "autoSync": {
+          "label": "Enable auto-sync",
+          "helper": "Automatically import new issues matching the filter labels"
+        },
+        "buttons": {
+          "loadIssues": "Load Issues",
+          "syncNow": "Sync Now",
+          "save": "Save GitHub Settings",
+          "import": "Import"
+        },
+        "issues": {
+          "title": "Open Issues",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitHub settings saved successfully",
+          "configureFirst": "Please configure GitHub repository URL and token first",
+          "loadError": "Failed to load GitHub issues",
+          "importError": "Failed to import issue",
+          "syncError": "Failed to sync issues"
+        }
       }
     }
   },

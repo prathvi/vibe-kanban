@@ -413,6 +413,10 @@ pub trait ContainerService {
                                 } else {
                                     project.default_agent_working_dir.clone()
                                 },
+                                github_repo_url: None,
+                                github_token: None,
+                                github_sync_enabled: None,
+                                github_sync_labels: None,
                             },
                         )
                         .await?;

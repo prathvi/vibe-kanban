@@ -370,6 +370,51 @@
         "unsavedChanges": "• 您有未保存的更改",
         "discard": "放弃",
         "confirmSwitch": "您有未保存的更改。您确定要切换项目吗？您的更改将丢失。"
+      },
+      "githubIntegration": {
+        "title": "GitHub 集成",
+        "description": "从 GitHub 导入议题并自动将新议题同步为任务",
+        "repoUrl": {
+          "label": "仓库 URL",
+          "placeholder": "owner/repo 或 https://github.com/owner/repo",
+          "helper": "以 owner/repo 格式输入 GitHub 仓库"
+        },
+        "token": {
+          "label": "个人访问令牌",
+          "placeholder": "ghp_xxxxxxxxxxxx",
+          "placeholderExisting": "输入新令牌以替换现有令牌",
+          "saved": "(已保存)",
+          "helper": "创建具有 \"repo\" 权限的令牌",
+          "show": "显示",
+          "hide": "隐藏",
+          "settingsLink": "GitHub 设置"
+        },
+        "syncLabels": {
+          "label": "按标签筛选（可选）",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "用逗号分隔的标签列表来筛选议题"
+        },
+        "autoSync": {
+          "label": "启用自动同步",
+          "helper": "自动导入匹配筛选标签的新议题"
+        },
+        "buttons": {
+          "loadIssues": "加载议题",
+          "syncNow": "立即同步",
+          "save": "保存 GitHub 设置",
+          "import": "导入"
+        },
+        "issues": {
+          "title": "待处理议题",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitHub 设置保存成功",
+          "configureFirst": "请先配置 GitHub 仓库 URL 和令牌",
+          "loadError": "加载 GitHub 议题失败",
+          "importError": "导入议题失败",
+          "syncError": "同步议题失败"
+        }
       }
     }
   },

@@ -87,6 +87,10 @@ export function NoServerContent({
           dev_script: script,
           dev_script_working_dir: project.dev_script_working_dir ?? null,
           default_agent_working_dir: project.default_agent_working_dir ?? null,
+          github_repo_url: null,
+          github_token: null,
+          github_sync_enabled: null,
+          github_sync_labels: null,
         },
       },
       {

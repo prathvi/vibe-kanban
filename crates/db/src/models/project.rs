@@ -25,6 +25,14 @@ pub struct Project {
     pub dev_script_working_dir: Option<String>,
     pub default_agent_working_dir: Option<String>,
     pub remote_project_id: Option<Uuid>,
+    pub github_repo_url: Option<String>,
+    #[serde(skip_serializing)]
+    #[ts(skip)]
+    pub github_token: Option<String>,
+    pub github_sync_enabled: bool,
+    pub github_sync_labels: Option<String>,
+    #[ts(type = "string | null")]
+    pub github_last_sync_at: Option<DateTime<Utc>>,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
@@ -43,6 +51,10 @@ pub struct UpdateProject {
     pub dev_script: Option<String>,
     pub dev_script_working_dir: Option<String>,
     pub default_agent_working_dir: Option<String>,
+    pub github_repo_url: Option<String>,
+    pub github_token: Option<String>,
+    pub github_sync_enabled: Option<bool>,
+    pub github_sync_labels: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -75,6 +87,11 @@ impl Project {
                       dev_script_working_dir,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -84,7 +101,6 @@ impl Project {
         .await
     }
 
-    /// Find the most actively used projects based on recent task activity
     pub async fn find_most_active(pool: &SqlitePool, limit: i32) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
@@ -92,6 +108,11 @@ impl Project {
             SELECT p.id as "id!: Uuid", p.name, p.dev_script, p.dev_script_working_dir,
                    p.default_agent_working_dir,
                    p.remote_project_id as "remote_project_id: Uuid",
+                   p.github_repo_url,
+                   p.github_token,
+                   p.github_sync_enabled as "github_sync_enabled!: bool",
+                   p.github_sync_labels,
+                   p.github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                    p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
             FROM projects p
             WHERE p.id IN (
@@ -117,6 +138,11 @@ impl Project {
                       dev_script_working_dir,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -136,6 +162,11 @@ impl Project {
                       dev_script_working_dir,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -158,6 +189,11 @@ impl Project {
                       dev_script_working_dir,
                       default_agent_working_dir,
                       remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -188,6 +224,11 @@ impl Project {
                           dev_script_working_dir,
                           default_agent_working_dir,
                           remote_project_id as "remote_project_id: Uuid",
+                          github_repo_url,
+                          github_token,
+                          github_sync_enabled as "github_sync_enabled!: bool",
+                          github_sync_labels,
+                          github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>""#,
             project_id,
@@ -210,11 +251,22 @@ impl Project {
         let dev_script = payload.dev_script.clone();
         let dev_script_working_dir = payload.dev_script_working_dir.clone();
         let default_agent_working_dir = payload.default_agent_working_dir.clone();
+        let github_repo_url = payload.github_repo_url.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.github_repo_url);
+        let github_token = payload.github_token.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.github_token);
+        let github_sync_enabled = payload.github_sync_enabled.unwrap_or(existing.github_sync_enabled);
+        let github_sync_labels = payload.github_sync_labels.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.github_sync_labels);
 
         sqlx::query_as!(
             Project,
             r#"UPDATE projects
-               SET name = $2, dev_script = $3, dev_script_working_dir = $4, default_agent_working_dir = $5
+               SET name = $2, dev_script = $3, dev_script_working_dir = $4, default_agent_working_dir = $5,
+                   github_repo_url = $6, github_token = $7, github_sync_enabled = $8, github_sync_labels = $9
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          name,
@@ -222,6 +274,11 @@ impl Project {
                          dev_script_working_dir,
                          default_agent_working_dir,
                          remote_project_id as "remote_project_id: Uuid",
+                         github_repo_url,
+                         github_token,
+                         github_sync_enabled as "github_sync_enabled!: bool",
+                         github_sync_labels,
+                         github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
@@ -229,6 +286,10 @@ impl Project {
             dev_script,
             dev_script_working_dir,
             default_agent_working_dir,
+            github_repo_url,
+            github_token,
+            github_sync_enabled,
+            github_sync_labels,
         )
         .fetch_one(pool)
         .await
@@ -294,5 +355,45 @@ impl Project {
             .execute(pool)
             .await?;
         Ok(result.rows_affected())
+    }
+
+    pub async fn update_github_last_sync(
+        pool: &SqlitePool,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE projects
+               SET github_last_sync_at = datetime('now')
+               WHERE id = $1"#,
+            id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn find_with_github_sync_enabled(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            r#"SELECT id as "id!: Uuid",
+                      name,
+                      dev_script,
+                      dev_script_working_dir,
+                      default_agent_working_dir,
+                      remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      created_at as "created_at!: DateTime<Utc>",
+                      updated_at as "updated_at!: DateTime<Utc>"
+               FROM projects
+               WHERE github_sync_enabled = 1
+                 AND github_repo_url IS NOT NULL
+                 AND github_token IS NOT NULL"#
+        )
+        .fetch_all(pool)
+        .await
     }
 }

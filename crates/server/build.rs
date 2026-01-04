@@ -3,6 +3,12 @@ use std::{fs, path::Path};
 fn main() {
     dotenv::dotenv().ok();
 
+    // Link AppKit framework on macOS (required by mac-notification-sys)
+    #[cfg(target_os = "macos")]
+    {
+        println!("cargo:rustc-link-lib=framework=AppKit");
+    }
+
     if let Ok(api_key) = std::env::var("POSTHOG_API_KEY") {
         println!("cargo:rustc-env=POSTHOG_API_KEY={}", api_key);
     }

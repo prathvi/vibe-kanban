@@ -13,6 +13,7 @@ pub mod filesystem;
 pub mod events;
 pub mod execution_processes;
 pub mod frontend;
+pub mod github_issues;
 pub mod health;
 pub mod images;
 pub mod oauth;
