@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/tooltip';
 import { OAuthDialog } from '@/components/dialogs/global/OAuthDialog';
 import { useUserSystem } from '@/components/ConfigProvider';
+import { useLocalAuth } from '@/contexts/LocalAuthContext';
 import { oauthApi } from '@/lib/api';
 
 const INTERNAL_NAV = [{ label: 'Projects', icon: FolderOpen, to: '/projects' }];
@@ -79,6 +80,7 @@ export function Navbar() {
   const handleOpenInEditor = useOpenProjectInEditor(project || null);
   const { data: onlineCount } = useDiscordOnlineCount();
   const { loginStatus, reloadSystem } = useUserSystem();
+  const { isAuthenticated: isLocalAuthenticated, logout: localLogout } = useLocalAuth();
 
   const { data: repos } = useProjectRepos(projectId);
   const isSingleRepoProject = repos?.length === 1;
@@ -136,6 +138,15 @@ export function Navbar() {
   };
 
   const isOAuthLoggedIn = loginStatus?.status === 'loggedin';
+  const isLoggedIn = isOAuthLoggedIn || isLocalAuthenticated;
+
+  const handleLogout = async () => {
+    if (isOAuthLoggedIn) {
+      await handleOAuthLogout();
+    } else if (isLocalAuthenticated) {
+      await localLogout();
+    }
+  };
 
   return (
     <div className="border-b bg-background">
@@ -186,7 +197,7 @@ export function Navbar() {
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-1">
-            {isOAuthLoggedIn && shouldShowSharedToggle ? (
+            {isLoggedIn && shouldShowSharedToggle ? (
               <>
                 <div className="flex items-center gap-4">
                   <TooltipProvider>
@@ -302,8 +313,8 @@ export function Navbar() {
 
                   <DropdownMenuSeparator />
 
-                  {isOAuthLoggedIn ? (
-                    <DropdownMenuItem onSelect={handleOAuthLogout}>
+                  {isLoggedIn ? (
+                    <DropdownMenuItem onSelect={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
                       {t('common:signOut')}
                     </DropdownMenuItem>

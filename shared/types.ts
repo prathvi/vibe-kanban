@@ -208,6 +208,28 @@ export type CheckAgentAvailabilityQuery = { executor: BaseCodingAgent, };
 
 export type CurrentUserResponse = { user_id: string, };
 
+export type RegisterRequest = { username: string, password: string, email: string | null, };
+
+export type LoginRequest = { username: string, password: string, };
+
+export type RefreshRequest = { refresh_token: string, };
+
+export type AuthTokensResponse = { access_token: string, refresh_token: string, user: UserPublic, };
+
+export type SetupStatusResponse = { setup_required: boolean, user_count: bigint, };
+
+export type UserPublic = { id: string, username: string, email: string | null, role: "admin" | "user", created_at: string, };
+
+export type UserRole = "admin" | "user";
+
+export type UpdateUser = { email: string | null, role: string | null, };
+
+export type CreateUserRequest = { username: string, password: string, email: string | null, role: string | null, };
+
+export type UpdateUserRequest = { email: string | null, role: string | null, password: string | null, };
+
+export type UsersListResponse = { users: Array<UserPublic>, };
+
 export type CreateFollowUpAttempt = { prompt: string, variant: string | null, retry_process_id: string | null, force_when_dirty: boolean | null, perform_git_reset: boolean | null, };
 
 export type ChangeTargetBranchRequest = { repo_id: string, new_target_branch: string, };

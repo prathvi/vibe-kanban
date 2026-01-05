@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM user_sessions WHERE refresh_token = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "15aaad68e19926618a238b8de0402a9758284703d1b39a900e06ce132898c561"
+}

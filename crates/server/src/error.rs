@@ -7,7 +7,7 @@ use axum::{
 use db::models::{
     execution_process::ExecutionProcessError, project::ProjectError,
     project_repo::ProjectRepoError, repo::RepoError, scratch::ScratchError, session::SessionError,
-    workspace::WorkspaceError,
+    user::UserError, workspace::WorkspaceError,
 };
 use deployment::{DeploymentError, RemoteClientNotConfigured};
 use executors::executors::ExecutorError;
@@ -42,6 +42,8 @@ pub enum ApiError {
     ScratchError(#[from] ScratchError),
     #[error(transparent)]
     ExecutionProcess(#[from] ExecutionProcessError),
+    #[error(transparent)]
+    User(#[from] UserError),
     #[error(transparent)]
     GitService(#[from] GitServiceError),
     #[error(transparent)]
@@ -109,6 +111,13 @@ impl IntoResponse for ApiError {
                     (StatusCode::NOT_FOUND, "ExecutionProcessError")
                 }
                 _ => (StatusCode::INTERNAL_SERVER_ERROR, "ExecutionProcessError"),
+            },
+            ApiError::User(err) => match err {
+                UserError::NotFound => (StatusCode::NOT_FOUND, "UserNotFound"),
+                UserError::UsernameExists => (StatusCode::CONFLICT, "UsernameExists"),
+                UserError::EmailExists => (StatusCode::CONFLICT, "EmailExists"),
+                UserError::InvalidCredentials => (StatusCode::UNAUTHORIZED, "InvalidCredentials"),
+                UserError::Database(_) => (StatusCode::INTERNAL_SERVER_ERROR, "UserError"),
             },
             // Promote certain GitService errors to conflict status with concise messages
             ApiError::GitService(git_err) => match git_err {
@@ -248,6 +257,13 @@ impl IntoResponse for ApiError {
                 },
                 RemoteClientError::Serde(_) => "Unexpected response from remote service.".to_string(),
                 RemoteClientError::Url(_) => "Remote service URL is invalid.".to_string(),
+            },
+            ApiError::User(err) => match err {
+                UserError::NotFound => "User not found.".to_string(),
+                UserError::UsernameExists => "A user with this username already exists.".to_string(),
+                UserError::EmailExists => "A user with this email already exists.".to_string(),
+                UserError::InvalidCredentials => "Invalid username or password.".to_string(),
+                UserError::Database(_) => "Failed to access user data.".to_string(),
             },
             ApiError::Unauthorized => "Unauthorized. Please sign in again.".to_string(),
             ApiError::BadRequest(msg) => msg.clone(),

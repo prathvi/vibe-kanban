@@ -12,7 +12,9 @@
         "mcp": "MCP Servers",
         "mcpDesc": "Model Context Protocol servers",
         "organizations": "Organization Settings",
-        "organizationsDesc": "Manage organization members and permissions"
+        "organizationsDesc": "Manage organization members and permissions",
+        "users": "User Management",
+        "usersDesc": "Manage user accounts and roles (Admin only)"
       }
     },
     "general": {

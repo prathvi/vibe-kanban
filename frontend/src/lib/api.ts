@@ -180,6 +180,12 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
     headers.set('Content-Type', 'application/json');
   }
 
+  // Add auth token if available
+  const token = localStorage.getItem('auth_access_token');
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   return fetch(url, {
     ...options,
     headers,
@@ -233,6 +239,18 @@ export const handleApiResponse = async <T, E = T>(
   response: Response
 ): Promise<T> => {
   if (!response.ok) {
+    // Handle 401 Unauthorized - redirect to login
+    if (response.status === 401) {
+      // Clear auth state
+      localStorage.removeItem('auth_access_token');
+      localStorage.removeItem('auth_refresh_token');
+      localStorage.removeItem('auth_user');
+      // Redirect to login if not already there
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+
     let errorMessage = `Request failed with status ${response.status}`;
 
     try {

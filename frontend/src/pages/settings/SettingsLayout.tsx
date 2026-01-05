@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, Cpu, Server, X, FolderOpen, Building2 } from 'lucide-react';
+import { Settings, Cpu, Server, X, FolderOpen, Building2, Users } from 'lucide-react';
+import { useLocalAuth } from '@/contexts/LocalAuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useEffect } from 'react';
@@ -9,7 +10,7 @@ import { useKeyExit } from '@/keyboard/hooks';
 import { Scope } from '@/keyboard/registry';
 import { usePreviousPath } from '@/hooks/usePreviousPath';
 
-const settingsNavigation = [
+const baseSettingsNavigation = [
   {
     path: 'general',
     icon: Settings,
@@ -32,10 +33,23 @@ const settingsNavigation = [
   },
 ];
 
+const adminSettingsNavigation = [
+  {
+    path: 'users',
+    icon: Users,
+  },
+];
+
 export function SettingsLayout() {
   const { t } = useTranslation('settings');
   const { enableScope, disableScope } = useHotkeysContext();
   const goToPreviousPath = usePreviousPath();
+  const { isAdmin } = useLocalAuth();
+
+  // Build navigation based on user role
+  const settingsNavigation = isAdmin
+    ? [...baseSettingsNavigation, ...adminSettingsNavigation]
+    : baseSettingsNavigation;
 
   // Enable SETTINGS scope when component mounts
   useEffect(() => {

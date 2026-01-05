@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle } from 'lucide-react';
 import { useLogStream } from '@/hooks/useLogStream';
 import RawLogText from '@/components/common/RawLogText';
@@ -18,42 +18,49 @@ export function ProcessLogsViewerContent({
   logs: LogEntry[];
   error: string | null;
 }) {
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   const didInitScroll = useRef(false);
   const prevLenRef = useRef(0);
   const [atBottom, setAtBottom] = useState(true);
+
+  const virtualizer = useVirtualizer({
+    count: logs.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 28,
+    overscan: 20,
+  });
+
+  // Check if user is at the bottom of the scroll
+  const checkAtBottom = useCallback(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const threshold = 50;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    setAtBottom(isAtBottom);
+  }, []);
 
   // 1) Initial jump to bottom once data appears.
   useEffect(() => {
     if (!didInitScroll.current && logs.length > 0) {
       didInitScroll.current = true;
       requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({
-          index: logs.length - 1,
-          align: 'end',
-        });
+        virtualizer.scrollToIndex(logs.length - 1, { align: 'end' });
       });
     }
-  }, [logs.length]);
+  }, [logs.length, virtualizer]);
 
-  // 2) If there's a large append and we're at bottom, force-stick to the last item.
+  // 2) Auto-scroll to bottom when new logs arrive (if user is at bottom)
   useEffect(() => {
     const prev = prevLenRef.current;
     const grewBy = logs.length - prev;
     prevLenRef.current = logs.length;
 
-    // tweak threshold as you like; this handles "big bursts"
-    const LARGE_BURST = 10;
-    if (grewBy >= LARGE_BURST && atBottom && logs.length > 0) {
-      // defer so Virtuoso can re-measure before jumping
+    if (grewBy > 0 && atBottom && logs.length > 0) {
       requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({
-          index: logs.length - 1,
-          align: 'end',
-        });
+        virtualizer.scrollToIndex(logs.length - 1, { align: 'end' });
       });
     }
-  }, [logs.length, atBottom, logs]);
+  }, [logs.length, atBottom, virtualizer]);
 
   const formatLogLine = (entry: LogEntry, index: number) => {
     return (
@@ -78,19 +85,37 @@ export function ProcessLogsViewerContent({
           {error}
         </div>
       ) : (
-        <Virtuoso<LogEntry>
-          ref={virtuosoRef}
-          className="flex-1 rounded-lg"
-          data={logs}
-          itemContent={(index, entry) =>
-            formatLogLine(entry as LogEntry, index)
-          }
-          // Keep pinned while user is at bottom; release when they scroll up
-          atBottomStateChange={setAtBottom}
-          followOutput={atBottom ? 'smooth' : false}
-          // Optional: a bit more overscan helps during bursts
-          increaseViewportBy={{ top: 0, bottom: 600 }}
-        />
+        <div
+          ref={parentRef}
+          className="flex-1 rounded-lg h-full overflow-auto"
+          onScroll={checkAtBottom}
+        >
+          <div
+            style={{
+              height: `${virtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const entry = logs[virtualRow.index];
+              return (
+                <div
+                  key={virtualRow.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {formatLogLine(entry, virtualRow.index)}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

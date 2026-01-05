@@ -104,6 +104,20 @@ fn generate_types_content() -> String {
         server::routes::config::CheckEditorAvailabilityResponse::decl(),
         server::routes::config::CheckAgentAvailabilityQuery::decl(),
         server::routes::oauth::CurrentUserResponse::decl(),
+        // Local auth types
+        server::routes::local_auth::RegisterRequest::decl(),
+        server::routes::local_auth::LoginRequest::decl(),
+        server::routes::local_auth::RefreshRequest::decl(),
+        server::routes::local_auth::AuthTokensResponse::decl(),
+        server::routes::local_auth::SetupStatusResponse::decl(),
+        // User types
+        db::models::user::UserPublic::decl(),
+        db::models::user::UserRole::decl(),
+        db::models::user::UpdateUser::decl(),
+        // User management types
+        server::routes::users::CreateUserRequest::decl(),
+        server::routes::users::UpdateUserRequest::decl(),
+        server::routes::users::UsersListResponse::decl(),
         server::routes::sessions::CreateFollowUpAttempt::decl(),
         server::routes::task_attempts::ChangeTargetBranchRequest::decl(),
         server::routes::task_attempts::ChangeTargetBranchResponse::decl(),

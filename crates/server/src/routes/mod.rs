@@ -17,6 +17,7 @@ pub mod github_issues;
 pub mod gitlab_issues;
 pub mod health;
 pub mod images;
+pub mod local_auth;
 pub mod oauth;
 pub mod organizations;
 pub mod projects;
@@ -27,11 +28,14 @@ pub mod shared_tasks;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
+pub mod users;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     // Create routers with different middleware layers
     let base_routes = Router::new()
         .route("/health", get(health::health_check))
+        .merge(local_auth::router())
+        .merge(users::router())
         .merge(config::router())
         .merge(containers::router(&deployment))
         .merge(projects::router(&deployment))

@@ -15,11 +15,13 @@ use axum::{
 use db::models::{
     image::TaskImage,
     project::{Project, ProjectError},
+    project_repo::ProjectRepo,
     repo::Repo,
-    task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
+    task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
     workspace::{CreateWorkspace, Workspace},
     workspace_repo::{CreateWorkspaceRepo, WorkspaceRepo},
 };
+use executors::profile::ExecutorConfigs;
 use deployment::Deployment;
 use executors::profile::ExecutorProfileId;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
@@ -255,24 +257,28 @@ pub async fn update_task(
     ensure_shared_task_auth(&existing_task, &deployment).await?;
 
     // Use existing values if not provided in update
-    let title = payload.title.unwrap_or(existing_task.title);
+    let title = payload.title.unwrap_or(existing_task.title.clone());
     let description = match payload.description {
         Some(s) if s.trim().is_empty() => None, // Empty string = clear description
         Some(s) => Some(s),                     // Non-empty string = update description
-        None => existing_task.description,      // Field omitted = keep existing
+        None => existing_task.description.clone(), // Field omitted = keep existing
     };
-    let status = payload.status.unwrap_or(existing_task.status);
+    let status = payload.status.clone().unwrap_or(existing_task.status.clone());
     let parent_workspace_id = payload
         .parent_workspace_id
         .or(existing_task.parent_workspace_id);
+
+    // Check if status is changing TO InProgress (for auto-start)
+    let status_changing_to_in_progress = existing_task.status != TaskStatus::InProgress
+        && status == TaskStatus::InProgress;
 
     let task = Task::update(
         &deployment.db().pool,
         existing_task.id,
         existing_task.project_id,
-        title,
-        description,
-        status,
+        title.clone(),
+        description.clone(),
+        status.clone(),
         parent_workspace_id,
     )
     .await?;
@@ -280,6 +286,23 @@ pub async fn update_task(
     if let Some(image_ids) = &payload.image_ids {
         TaskImage::delete_by_task_id(&deployment.db().pool, task.id).await?;
         TaskImage::associate_many_dedup(&deployment.db().pool, task.id, image_ids).await?;
+    }
+
+    // Auto-start Claude when task moves to InProgress and no attempt is running
+    if status_changing_to_in_progress {
+        let has_running = deployment
+            .container()
+            .has_running_processes(task.id)
+            .await
+            .unwrap_or(false);
+
+        if !has_running {
+            // Try to auto-start the task
+            if let Err(e) = auto_start_task(&deployment, &task).await {
+                tracing::warn!("Failed to auto-start task {}: {}", task.id, e);
+                // Don't fail the update, just log the warning
+            }
+        }
     }
 
     // If task has been shared, broadcast update
@@ -291,6 +314,95 @@ pub async fn update_task(
     }
 
     Ok(ResponseJson(ApiResponse::success(task)))
+}
+
+/// Auto-start a task by creating a workspace and starting the agent
+async fn auto_start_task(deployment: &DeploymentImpl, task: &Task) -> Result<(), ApiError> {
+    let pool = &deployment.db().pool;
+
+    // Get project repos with their full details
+    let repos = ProjectRepo::find_repos_for_project(pool, task.project_id).await?;
+    if repos.is_empty() {
+        tracing::info!(
+            "Cannot auto-start task {}: no repositories configured for project",
+            task.id
+        );
+        return Ok(());
+    }
+
+    // Get recommended executor profile
+    let executor_configs = ExecutorConfigs::get_cached();
+    let executor_profile_id = match executor_configs.get_recommended_executor_profile().await {
+        Ok(profile) => profile,
+        Err(e) => {
+            tracing::info!("Cannot auto-start task {}: {}", task.id, e);
+            return Ok(());
+        }
+    };
+
+    // Get project for default working dir
+    let project = Project::find_by_id(pool, task.project_id)
+        .await?
+        .ok_or(ProjectError::ProjectNotFound)?;
+
+    let attempt_id = Uuid::new_v4();
+    let git_branch_name = deployment
+        .container()
+        .git_branch_from_workspace(&attempt_id, &task.title)
+        .await;
+
+    let agent_working_dir = project
+        .default_agent_working_dir
+        .as_ref()
+        .filter(|dir: &&String| !dir.is_empty())
+        .cloned();
+
+    let workspace = Workspace::create(
+        pool,
+        &CreateWorkspace {
+            branch: git_branch_name,
+            agent_working_dir,
+        },
+        attempt_id,
+        task.id,
+    )
+    .await?;
+
+    // Create workspace repos using each repo's current branch as target
+    let mut workspace_repos: Vec<CreateWorkspaceRepo> = Vec::new();
+    for repo in &repos {
+        let target_branch = deployment
+            .git()
+            .get_current_branch(&repo.path)
+            .unwrap_or_else(|_| "main".to_string());
+        workspace_repos.push(CreateWorkspaceRepo {
+            repo_id: repo.id,
+            target_branch,
+        });
+    }
+    WorkspaceRepo::create_many(pool, workspace.id, &workspace_repos).await?;
+
+    // Start the workspace
+    deployment
+        .container()
+        .start_workspace(&workspace, executor_profile_id.clone())
+        .await
+        .inspect_err(|err| tracing::error!("Failed to auto-start task attempt: {}", err))?;
+
+    deployment
+        .track_if_analytics_allowed(
+            "task_attempt_auto_started",
+            serde_json::json!({
+                "task_id": task.id.to_string(),
+                "executor": &executor_profile_id.executor,
+                "variant": &executor_profile_id.variant,
+                "workspace_id": workspace.id.to_string(),
+            }),
+        )
+        .await;
+
+    tracing::info!("Auto-started attempt for task {}", task.id);
+    Ok(())
 }
 
 async fn ensure_shared_task_auth(
@@ -335,10 +447,15 @@ pub async fn delete_task(
 
     let repositories = WorkspaceRepo::find_unique_repos_for_task(pool, task.id).await?;
 
-    // Collect workspace directories that need cleanup
-    let workspace_dirs: Vec<PathBuf> = attempts
+    // Collect workspace directories and branches that need cleanup
+    let workspace_cleanup_data: Vec<(PathBuf, String)> = attempts
         .iter()
-        .filter_map(|attempt| attempt.container_ref.as_ref().map(PathBuf::from))
+        .filter_map(|attempt| {
+            attempt
+                .container_ref
+                .as_ref()
+                .map(|cr| (PathBuf::from(cr), attempt.branch.clone()))
+        })
         .collect();
 
     if let Some(shared_task_id) = task.shared_task_id {
@@ -395,12 +512,13 @@ pub async fn delete_task(
         tracing::info!(
             "Starting background cleanup for task {} ({} workspaces, {} repos)",
             task_id,
-            workspace_dirs.len(),
+            workspace_cleanup_data.len(),
             repositories.len()
         );
 
-        for workspace_dir in &workspace_dirs {
-            if let Err(e) = WorkspaceManager::cleanup_workspace(workspace_dir, &repositories).await
+        for (workspace_dir, branch) in &workspace_cleanup_data {
+            if let Err(e) =
+                WorkspaceManager::cleanup_workspace(workspace_dir, &repositories, branch).await
             {
                 tracing::error!(
                     "Background workspace cleanup failed for task {} at {}: {}",

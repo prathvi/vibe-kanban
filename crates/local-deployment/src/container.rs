@@ -163,7 +163,7 @@ impl LocalContainerService {
                 tracing::warn!("Failed to remove workspace directory: {}", e);
             }
         } else {
-            WorkspaceManager::cleanup_workspace(&workspace_dir, &repositories)
+            WorkspaceManager::cleanup_workspace(&workspace_dir, &repositories, &workspace.branch)
                 .await
                 .unwrap_or_else(|e| {
                     tracing::warn!(

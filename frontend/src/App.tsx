@@ -5,6 +5,7 @@ import i18n from '@/i18n';
 import { Projects } from '@/pages/Projects';
 import { ProjectTasks } from '@/pages/ProjectTasks';
 import { FullAttemptLogsPage } from '@/pages/FullAttemptLogs';
+import { Login } from '@/pages/Login';
 import { NormalLayout } from '@/components/layout/NormalLayout';
 import { usePostHog } from 'posthog-js/react';
 import { useAuth } from '@/hooks';
@@ -17,7 +18,10 @@ import {
   OrganizationSettings,
   ProjectSettings,
   SettingsLayout,
+  UserSettings,
 } from '@/pages/settings/';
+import { LocalAuthProvider } from '@/contexts/LocalAuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { UserSystemProvider, useUserSystem } from '@/components/ConfigProvider';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { SearchProvider } from '@/contexts/SearchContext';
@@ -121,13 +125,26 @@ function AppContent() {
         <SearchProvider>
           <div className="h-screen flex flex-col bg-background">
             <SentryRoutes>
+              {/* Login route (public) */}
+              <Route path="/login" element={<Login />} />
+
               {/* VS Code full-page logs route (outside NormalLayout for minimal UI) */}
               <Route
                 path="/projects/:projectId/tasks/:taskId/attempts/:attemptId/full"
-                element={<FullAttemptLogsPage />}
+                element={
+                  <ProtectedRoute>
+                    <FullAttemptLogsPage />
+                  </ProtectedRoute>
+                }
               />
 
-              <Route element={<NormalLayout />}>
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <NormalLayout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route path="/" element={<Projects />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:projectId" element={<Projects />} />
@@ -145,6 +162,7 @@ function AppContent() {
                   />
                   <Route path="agents" element={<AgentSettings />} />
                   <Route path="mcp" element={<McpSettings />} />
+                  <Route path="users" element={<UserSettings />} />
                 </Route>
                 <Route
                   path="/mcp-servers"
@@ -170,17 +188,19 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <UserSystemProvider>
-        <ClickedElementsProvider>
-          <ProjectProvider>
-            <HotkeysProvider initiallyActiveScopes={['*', 'global', 'kanban']}>
-              <NiceModal.Provider>
-                <AppContent />
-              </NiceModal.Provider>
-            </HotkeysProvider>
-          </ProjectProvider>
-        </ClickedElementsProvider>
-      </UserSystemProvider>
+      <LocalAuthProvider>
+        <UserSystemProvider>
+          <ClickedElementsProvider>
+            <ProjectProvider>
+              <HotkeysProvider initiallyActiveScopes={['*', 'global', 'kanban']}>
+                <NiceModal.Provider>
+                  <AppContent />
+                </NiceModal.Provider>
+              </HotkeysProvider>
+            </ProjectProvider>
+          </ClickedElementsProvider>
+        </UserSystemProvider>
+      </LocalAuthProvider>
     </BrowserRouter>
   );
 }
