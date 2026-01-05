@@ -415,6 +415,51 @@
           "importError": "イシューのインポートに失敗しました",
           "syncError": "イシューの同期に失敗しました"
         }
+      },
+      "gitlabIntegration": {
+        "title": "GitLab連携",
+        "description": "GitLabからイシューをインポートし、新しいイシューを自動的にタスクとして同期",
+        "projectUrl": {
+          "label": "プロジェクトURL",
+          "placeholder": "namespace/project または https://gitlab.com/namespace/project",
+          "helper": "namespace/project形式でGitLabプロジェクトを入力"
+        },
+        "token": {
+          "label": "個人アクセストークン",
+          "placeholder": "glpat-xxxxxxxxxxxx",
+          "placeholderExisting": "既存のトークンを置き換えるには新しいトークンを入力",
+          "saved": "(保存済み)",
+          "helper": "\"read_api\"スコープでトークンを作成",
+          "show": "表示",
+          "hide": "非表示",
+          "settingsLink": "GitLab設定"
+        },
+        "syncLabels": {
+          "label": "ラベルでフィルタ（オプション）",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "イシューをフィルタするためのカンマ区切りのラベルリスト"
+        },
+        "autoSync": {
+          "label": "自動同期を有効にする",
+          "helper": "フィルタラベルに一致する新しいイシューを自動的にインポート"
+        },
+        "buttons": {
+          "loadIssues": "イシューを読み込む",
+          "syncNow": "今すぐ同期",
+          "save": "GitLab設定を保存",
+          "import": "インポート"
+        },
+        "issues": {
+          "title": "オープンイシュー",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitLab設定が正常に保存されました",
+          "configureFirst": "まずGitLabプロジェクトURLとトークンを設定してください",
+          "loadError": "GitLabイシューの読み込みに失敗しました",
+          "importError": "イシューのインポートに失敗しました",
+          "syncError": "イシューの同期に失敗しました"
+        }
       }
     }
   },

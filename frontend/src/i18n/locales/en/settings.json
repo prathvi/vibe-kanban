@@ -415,6 +415,51 @@
           "importError": "Failed to import issue",
           "syncError": "Failed to sync issues"
         }
+      },
+      "gitlabIntegration": {
+        "title": "GitLab Integration",
+        "description": "Import issues from GitLab and auto-sync new issues as tasks",
+        "projectUrl": {
+          "label": "Project URL",
+          "placeholder": "namespace/project or https://gitlab.com/namespace/project",
+          "helper": "Enter the GitLab project in namespace/project format"
+        },
+        "token": {
+          "label": "Personal Access Token",
+          "placeholder": "glpat-xxxxxxxxxxxx",
+          "placeholderExisting": "Enter new token to replace existing",
+          "saved": "(saved)",
+          "helper": "Create a token with \"read_api\" scope",
+          "show": "Show",
+          "hide": "Hide",
+          "settingsLink": "GitLab Settings"
+        },
+        "syncLabels": {
+          "label": "Filter by Labels (optional)",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "Comma-separated list of labels to filter issues"
+        },
+        "autoSync": {
+          "label": "Enable auto-sync",
+          "helper": "Automatically import new issues matching the filter labels"
+        },
+        "buttons": {
+          "loadIssues": "Load Issues",
+          "syncNow": "Sync Now",
+          "save": "Save GitLab Settings",
+          "import": "Import"
+        },
+        "issues": {
+          "title": "Open Issues",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitLab settings saved successfully",
+          "configureFirst": "Please configure GitLab project URL and token first",
+          "loadError": "Failed to load GitLab issues",
+          "importError": "Failed to import issue",
+          "syncError": "Failed to sync issues"
+        }
       }
     }
   },

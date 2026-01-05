@@ -23,14 +23,14 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Trash2, Github, RefreshCw, ExternalLink } from 'lucide-react';
+import { Loader2, Plus, Trash2, Github, GitlabIcon, RefreshCw, ExternalLink } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { CopyFilesField } from '@/components/projects/CopyFilesField';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
-import { projectsApi, GitHubIssue } from '@/lib/api';
+import { projectsApi, GitHubIssue, GitLabIssue } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, ProjectRepo, Repo, UpdateProject } from 'shared/types';
 
@@ -53,6 +53,13 @@ interface GitHubFormState {
   github_token: string;
   github_sync_enabled: boolean;
   github_sync_labels: string;
+}
+
+interface GitLabFormState {
+  gitlab_project_url: string;
+  gitlab_token: string;
+  gitlab_sync_enabled: boolean;
+  gitlab_sync_labels: string;
 }
 
 function projectToFormState(project: Project): ProjectFormState {
@@ -136,6 +143,22 @@ export function ProjectSettings() {
   const [syncingIssues, setSyncingIssues] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [hasExistingToken, setHasExistingToken] = useState(false);
+
+  // GitLab integration state
+  const [gitlabDraft, setGitlabDraft] = useState<GitLabFormState>({
+    gitlab_project_url: '',
+    gitlab_token: '',
+    gitlab_sync_enabled: false,
+    gitlab_sync_labels: '',
+  });
+  const [savingGitlab, setSavingGitlab] = useState(false);
+  const [gitlabSuccess, setGitlabSuccess] = useState(false);
+  const [gitlabError, setGitlabError] = useState<string | null>(null);
+  const [gitlabIssues, setGitlabIssues] = useState<GitLabIssue[]>([]);
+  const [loadingGitlabIssues, setLoadingGitlabIssues] = useState(false);
+  const [syncingGitlabIssues, setSyncingGitlabIssues] = useState(false);
+  const [showGitlabToken, setShowGitlabToken] = useState(false);
+  const [hasExistingGitlabToken, setHasExistingGitlabToken] = useState(false);
 
   // Get OS-appropriate script placeholders
   const placeholders = useScriptPlaceholders();
@@ -328,6 +351,21 @@ export function ProjectSettings() {
       .catch(() => {
         setHasExistingToken(false);
       });
+
+    projectsApi
+      .getGitLabConfig(selectedProjectId)
+      .then((config) => {
+        setGitlabDraft({
+          gitlab_project_url: config.project_url ?? '',
+          gitlab_token: '',
+          gitlab_sync_enabled: config.sync_enabled,
+          gitlab_sync_labels: config.sync_labels ?? '',
+        });
+        setHasExistingGitlabToken(config.has_token);
+      })
+      .catch(() => {
+        setHasExistingGitlabToken(false);
+      });
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -452,6 +490,10 @@ export function ProjectSettings() {
         github_token: null,
         github_sync_enabled: null,
         github_sync_labels: null,
+        gitlab_project_url: null,
+        gitlab_token: null,
+        gitlab_sync_enabled: null,
+        gitlab_sync_labels: null,
       };
 
       updateProject.mutate({
@@ -524,6 +566,10 @@ export function ProjectSettings() {
     setGithubDraft((prev) => ({ ...prev, ...updates }));
   };
 
+  const updateGitlabDraft = (updates: Partial<GitLabFormState>) => {
+    setGitlabDraft((prev) => ({ ...prev, ...updates }));
+  };
+
   const handleSaveGithub = async () => {
     if (!selectedProject) return;
 
@@ -541,6 +587,10 @@ export function ProjectSettings() {
         github_token: githubDraft.github_token.trim() || null,
         github_sync_enabled: githubDraft.github_sync_enabled,
         github_sync_labels: githubDraft.github_sync_labels.trim() || null,
+        gitlab_project_url: null,
+        gitlab_token: null,
+        gitlab_sync_enabled: null,
+        gitlab_sync_labels: null,
       };
 
       await projectsApi.update(selectedProject.id, updateData);
@@ -614,6 +664,103 @@ export function ProjectSettings() {
       );
     } finally {
       setSyncingIssues(false);
+    }
+  };
+
+  const handleSaveGitlab = async () => {
+    if (!selectedProject) return;
+
+    setSavingGitlab(true);
+    setGitlabError(null);
+    setGitlabSuccess(false);
+
+    try {
+      const updateData: UpdateProject = {
+        name: selectedProject.name,
+        dev_script: selectedProject.dev_script ?? null,
+        dev_script_working_dir: selectedProject.dev_script_working_dir ?? null,
+        default_agent_working_dir: selectedProject.default_agent_working_dir ?? null,
+        github_repo_url: null,
+        github_token: null,
+        github_sync_enabled: null,
+        github_sync_labels: null,
+        gitlab_project_url: gitlabDraft.gitlab_project_url.trim() || null,
+        gitlab_token: gitlabDraft.gitlab_token.trim() || null,
+        gitlab_sync_enabled: gitlabDraft.gitlab_sync_enabled,
+        gitlab_sync_labels: gitlabDraft.gitlab_sync_labels.trim() || null,
+      };
+
+      await projectsApi.update(selectedProject.id, updateData);
+      setGitlabSuccess(true);
+      if (gitlabDraft.gitlab_token.trim()) {
+        setHasExistingGitlabToken(true);
+      }
+      setGitlabDraft((prev) => ({ ...prev, gitlab_token: '' }));
+      setTimeout(() => setGitlabSuccess(false), 3000);
+    } catch (err) {
+      setGitlabError(
+        err instanceof Error ? err.message : 'Failed to save GitLab settings'
+      );
+    } finally {
+      setSavingGitlab(false);
+    }
+  };
+
+  const handleLoadGitlabIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setLoadingGitlabIssues(true);
+    setGitlabError(null);
+
+    try {
+      const response = await projectsApi.listGitLabIssues(selectedProjectId);
+      if (!response.has_gitlab_config) {
+        setGitlabError(t('settings.projects.gitlabIntegration.messages.configureFirst'));
+        setGitlabIssues([]);
+      } else {
+        setGitlabIssues(response.issues);
+      }
+    } catch (err) {
+      setGitlabError(
+        err instanceof Error ? err.message : t('settings.projects.gitlabIntegration.messages.loadError')
+      );
+    } finally {
+      setLoadingGitlabIssues(false);
+    }
+  };
+
+  const handleImportGitlabIssue = async (issueIid: number) => {
+    if (!selectedProjectId) return;
+
+    try {
+      await projectsApi.importGitLabIssue(selectedProjectId, issueIid);
+      setGitlabIssues((prev) => prev.filter((i) => i.iid !== issueIid));
+    } catch (err) {
+      setGitlabError(
+        err instanceof Error ? err.message : t('settings.projects.gitlabIntegration.messages.importError')
+      );
+    }
+  };
+
+  const handleSyncGitlabIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setSyncingGitlabIssues(true);
+    setGitlabError(null);
+
+    try {
+      const imported = await projectsApi.syncGitLabIssues(selectedProjectId);
+      if (imported.length > 0) {
+        setGitlabSuccess(true);
+        setTimeout(() => setGitlabSuccess(false), 3000);
+      }
+      await handleLoadGitlabIssues();
+    } catch (err) {
+      setGitlabError(
+        err instanceof Error ? err.message : t('settings.projects.gitlabIntegration.messages.syncError')
+      );
+    } finally {
+      setSyncingGitlabIssues(false);
     }
   };
 
@@ -1286,6 +1433,215 @@ export function ProjectSettings() {
                           onClick={() => handleImportIssue(issue.number)}
                         >
                           {t('settings.projects.githubIntegration.buttons.import')}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GitlabIcon className="h-5 w-5" />
+                {t('settings.projects.gitlabIntegration.title')}
+              </CardTitle>
+              <CardDescription>
+                {t('settings.projects.gitlabIntegration.description')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {gitlabError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{gitlabError}</AlertDescription>
+                </Alert>
+              )}
+
+              {gitlabSuccess && (
+                <Alert variant="success">
+                  <AlertDescription className="font-medium">
+                    {t('settings.projects.gitlabIntegration.messages.success')}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="gitlab-project-url">
+                  {t('settings.projects.gitlabIntegration.projectUrl.label')}
+                </Label>
+                <Input
+                  id="gitlab-project-url"
+                  value={gitlabDraft.gitlab_project_url}
+                  onChange={(e) =>
+                    updateGitlabDraft({ gitlab_project_url: e.target.value })
+                  }
+                  placeholder={t('settings.projects.gitlabIntegration.projectUrl.placeholder')}
+                  className="font-mono"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.gitlabIntegration.projectUrl.helper')}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="gitlab-token">
+                    {t('settings.projects.gitlabIntegration.token.label')}
+                  </Label>
+                  {hasExistingGitlabToken && !gitlabDraft.gitlab_token && (
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      {t('settings.projects.gitlabIntegration.token.saved')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="gitlab-token"
+                    type={showGitlabToken ? 'text' : 'password'}
+                    value={gitlabDraft.gitlab_token}
+                    onChange={(e) =>
+                      updateGitlabDraft({ gitlab_token: e.target.value })
+                    }
+                    placeholder={
+                      hasExistingGitlabToken
+                        ? t('settings.projects.gitlabIntegration.token.placeholderExisting')
+                        : t('settings.projects.gitlabIntegration.token.placeholder')
+                    }
+                    className="font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowGitlabToken(!showGitlabToken)}
+                  >
+                    {showGitlabToken
+                      ? t('settings.projects.gitlabIntegration.token.hide')
+                      : t('settings.projects.gitlabIntegration.token.show')}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.gitlabIntegration.token.helper')}{' '}
+                  <a
+                    href="https://gitlab.com/-/user_settings/personal_access_tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('settings.projects.gitlabIntegration.token.settingsLink')}
+                    <ExternalLink className="inline h-3 w-3 ml-1" />
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="gitlab-sync-labels">
+                  {t('settings.projects.gitlabIntegration.syncLabels.label')}
+                </Label>
+                <Input
+                  id="gitlab-sync-labels"
+                  value={gitlabDraft.gitlab_sync_labels}
+                  onChange={(e) =>
+                    updateGitlabDraft({ gitlab_sync_labels: e.target.value })
+                  }
+                  placeholder={t('settings.projects.gitlabIntegration.syncLabels.placeholder')}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.projects.gitlabIntegration.syncLabels.helper')}
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="gitlab-sync-enabled"
+                  checked={gitlabDraft.gitlab_sync_enabled}
+                  onCheckedChange={(checked) =>
+                    updateGitlabDraft({ gitlab_sync_enabled: checked })
+                  }
+                />
+                <Label htmlFor="gitlab-sync-enabled" className="cursor-pointer">
+                  {t('settings.projects.gitlabIntegration.autoSync.label')}
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.projects.gitlabIntegration.autoSync.helper')}
+              </p>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadGitlabIssues}
+                    disabled={loadingGitlabIssues || !gitlabDraft.gitlab_project_url}
+                  >
+                    {loadingGitlabIssues && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {t('settings.projects.gitlabIntegration.buttons.loadIssues')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncGitlabIssues}
+                    disabled={syncingGitlabIssues || !gitlabDraft.gitlab_project_url}
+                  >
+                    {syncingGitlabIssues ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    {t('settings.projects.gitlabIntegration.buttons.syncNow')}
+                  </Button>
+                </div>
+                <Button
+                  onClick={handleSaveGitlab}
+                  disabled={savingGitlab}
+                >
+                  {savingGitlab && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {t('settings.projects.gitlabIntegration.buttons.save')}
+                </Button>
+              </div>
+
+              {gitlabIssues.length > 0 && (
+                <div className="pt-4 border-t">
+                  <Label className="mb-3 block">
+                    {t('settings.projects.gitlabIntegration.issues.title')} ({gitlabIssues.length})
+                  </Label>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {gitlabIssues.map((issue) => (
+                      <div
+                        key={issue.iid}
+                        className="flex items-center justify-between p-3 border rounded-md"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">
+                            #{issue.iid} {issue.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{issue.author.username}</span>
+                            {issue.labels.length > 0 && (
+                              <div className="flex gap-1">
+                                {issue.labels.slice(0, 3).map((label) => (
+                                  <span
+                                    key={label}
+                                    className="px-1.5 py-0.5 text-xs rounded bg-muted"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImportGitlabIssue(issue.iid)}
+                        >
+                          {t('settings.projects.gitlabIntegration.buttons.import')}
                         </Button>
                       </div>
                     ))}

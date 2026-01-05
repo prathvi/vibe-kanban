@@ -91,6 +91,10 @@ export function NoServerContent({
           github_token: null,
           github_sync_enabled: null,
           github_sync_labels: null,
+          gitlab_project_url: null,
+          gitlab_token: null,
+          gitlab_sync_enabled: null,
+          gitlab_sync_labels: null,
         },
       },
       {

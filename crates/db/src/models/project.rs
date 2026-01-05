@@ -33,6 +33,14 @@ pub struct Project {
     pub github_sync_labels: Option<String>,
     #[ts(type = "string | null")]
     pub github_last_sync_at: Option<DateTime<Utc>>,
+    pub gitlab_project_url: Option<String>,
+    #[serde(skip_serializing)]
+    #[ts(skip)]
+    pub gitlab_token: Option<String>,
+    pub gitlab_sync_enabled: bool,
+    pub gitlab_sync_labels: Option<String>,
+    #[ts(type = "string | null")]
+    pub gitlab_last_sync_at: Option<DateTime<Utc>>,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
@@ -55,6 +63,10 @@ pub struct UpdateProject {
     pub github_token: Option<String>,
     pub github_sync_enabled: Option<bool>,
     pub github_sync_labels: Option<String>,
+    pub gitlab_project_url: Option<String>,
+    pub gitlab_token: Option<String>,
+    pub gitlab_sync_enabled: Option<bool>,
+    pub gitlab_sync_labels: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -92,6 +104,11 @@ impl Project {
                       github_sync_enabled as "github_sync_enabled!: bool",
                       github_sync_labels,
                       github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -113,6 +130,11 @@ impl Project {
                    p.github_sync_enabled as "github_sync_enabled!: bool",
                    p.github_sync_labels,
                    p.github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                   p.gitlab_project_url,
+                   p.gitlab_token,
+                   p.gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                   p.gitlab_sync_labels,
+                   p.gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                    p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
             FROM projects p
             WHERE p.id IN (
@@ -143,6 +165,11 @@ impl Project {
                       github_sync_enabled as "github_sync_enabled!: bool",
                       github_sync_labels,
                       github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -167,6 +194,11 @@ impl Project {
                       github_sync_enabled as "github_sync_enabled!: bool",
                       github_sync_labels,
                       github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -194,6 +226,11 @@ impl Project {
                       github_sync_enabled as "github_sync_enabled!: bool",
                       github_sync_labels,
                       github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -229,6 +266,11 @@ impl Project {
                           github_sync_enabled as "github_sync_enabled!: bool",
                           github_sync_labels,
                           github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                          gitlab_project_url,
+                          gitlab_token,
+                          gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                          gitlab_sync_labels,
+                          gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>""#,
             project_id,
@@ -261,12 +303,23 @@ impl Project {
         let github_sync_labels = payload.github_sync_labels.clone()
             .filter(|s| !s.is_empty())
             .or(existing.github_sync_labels);
+        let gitlab_project_url = payload.gitlab_project_url.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.gitlab_project_url);
+        let gitlab_token = payload.gitlab_token.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.gitlab_token);
+        let gitlab_sync_enabled = payload.gitlab_sync_enabled.unwrap_or(existing.gitlab_sync_enabled);
+        let gitlab_sync_labels = payload.gitlab_sync_labels.clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.gitlab_sync_labels);
 
         sqlx::query_as!(
             Project,
             r#"UPDATE projects
                SET name = $2, dev_script = $3, dev_script_working_dir = $4, default_agent_working_dir = $5,
-                   github_repo_url = $6, github_token = $7, github_sync_enabled = $8, github_sync_labels = $9
+                   github_repo_url = $6, github_token = $7, github_sync_enabled = $8, github_sync_labels = $9,
+                   gitlab_project_url = $10, gitlab_token = $11, gitlab_sync_enabled = $12, gitlab_sync_labels = $13
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          name,
@@ -279,6 +332,11 @@ impl Project {
                          github_sync_enabled as "github_sync_enabled!: bool",
                          github_sync_labels,
                          github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                         gitlab_project_url,
+                         gitlab_token,
+                         gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                         gitlab_sync_labels,
+                         gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
@@ -290,6 +348,10 @@ impl Project {
             github_token,
             github_sync_enabled,
             github_sync_labels,
+            gitlab_project_url,
+            gitlab_token,
+            gitlab_sync_enabled,
+            gitlab_sync_labels,
         )
         .fetch_one(pool)
         .await
@@ -386,12 +448,62 @@ impl Project {
                       github_sync_enabled as "github_sync_enabled!: bool",
                       github_sync_labels,
                       github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
                WHERE github_sync_enabled = 1
                  AND github_repo_url IS NOT NULL
                  AND github_token IS NOT NULL"#
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    pub async fn update_gitlab_last_sync(
+        pool: &SqlitePool,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE projects
+               SET gitlab_last_sync_at = datetime('now')
+               WHERE id = $1"#,
+            id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn find_with_gitlab_sync_enabled(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            r#"SELECT id as "id!: Uuid",
+                      name,
+                      dev_script,
+                      dev_script_working_dir,
+                      default_agent_working_dir,
+                      remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      created_at as "created_at!: DateTime<Utc>",
+                      updated_at as "updated_at!: DateTime<Utc>"
+               FROM projects
+               WHERE gitlab_sync_enabled = 1
+                 AND gitlab_project_url IS NOT NULL
+                 AND gitlab_token IS NOT NULL"#
         )
         .fetch_all(pool)
         .await

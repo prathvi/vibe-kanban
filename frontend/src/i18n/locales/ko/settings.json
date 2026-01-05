@@ -415,6 +415,51 @@
           "importError": "이슈 가져오기에 실패했습니다",
           "syncError": "이슈 동기화에 실패했습니다"
         }
+      },
+      "gitlabIntegration": {
+        "title": "GitLab 연동",
+        "description": "GitLab에서 이슈를 가져오고 새 이슈를 자동으로 태스크로 동기화",
+        "projectUrl": {
+          "label": "프로젝트 URL",
+          "placeholder": "namespace/project 또는 https://gitlab.com/namespace/project",
+          "helper": "namespace/project 형식으로 GitLab 프로젝트를 입력하세요"
+        },
+        "token": {
+          "label": "개인 액세스 토큰",
+          "placeholder": "glpat-xxxxxxxxxxxx",
+          "placeholderExisting": "기존 토큰을 교체하려면 새 토큰을 입력하세요",
+          "saved": "(저장됨)",
+          "helper": "\"read_api\" 스코프로 토큰을 생성하세요",
+          "show": "표시",
+          "hide": "숨기기",
+          "settingsLink": "GitLab 설정"
+        },
+        "syncLabels": {
+          "label": "레이블로 필터 (선택사항)",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "이슈를 필터링할 쉼표로 구분된 레이블 목록"
+        },
+        "autoSync": {
+          "label": "자동 동기화 활성화",
+          "helper": "필터 레이블과 일치하는 새 이슈를 자동으로 가져오기"
+        },
+        "buttons": {
+          "loadIssues": "이슈 불러오기",
+          "syncNow": "지금 동기화",
+          "save": "GitLab 설정 저장",
+          "import": "가져오기"
+        },
+        "issues": {
+          "title": "오픈 이슈",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitLab 설정이 성공적으로 저장되었습니다",
+          "configureFirst": "먼저 GitLab 프로젝트 URL과 토큰을 설정해주세요",
+          "loadError": "GitLab 이슈 불러오기에 실패했습니다",
+          "importError": "이슈 가져오기에 실패했습니다",
+          "syncError": "이슈 동기화에 실패했습니다"
+        }
       }
     }
   },

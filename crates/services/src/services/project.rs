@@ -136,6 +136,10 @@ impl ProjectService {
                     github_token: None,
                     github_sync_enabled: None,
                     github_sync_labels: None,
+                    gitlab_project_url: None,
+                    gitlab_token: None,
+                    gitlab_sync_enabled: None,
+                    gitlab_sync_labels: None,
                 },
             )
             .await?;

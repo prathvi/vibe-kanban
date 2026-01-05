@@ -12,11 +12,11 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, github_repo_url: string | null, github_sync_enabled: boolean, github_sync_labels: string | null, github_last_sync_at: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, github_repo_url: string | null, github_sync_enabled: boolean, github_sync_labels: string | null, github_last_sync_at: string | null, gitlab_project_url: string | null, gitlab_sync_enabled: boolean, gitlab_sync_labels: string | null, gitlab_last_sync_at: string | null, created_at: Date, updated_at: Date, };
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
-export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, github_repo_url: string | null, github_token: string | null, github_sync_enabled: boolean | null, github_sync_labels: string | null, };
+export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, github_repo_url: string | null, github_token: string | null, github_sync_enabled: boolean | null, github_sync_labels: string | null, gitlab_project_url: string | null, gitlab_token: string | null, gitlab_sync_enabled: boolean | null, gitlab_sync_labels: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
 
@@ -303,6 +303,22 @@ export type ImportIssueRequest = { issue_number: bigint, auto_start: boolean | n
 export type ImportIssueResponse = { task: Task, issue: GitHubIssue, };
 
 export type GitHubConfigStatus = { has_repo_url: boolean, has_token: boolean, repo_url: string | null, sync_enabled: boolean, sync_labels: string | null, };
+
+export type GitLabIssue = { iid: bigint, title: string, description: string | null, state: string, web_url: string, author: GitLabUser, labels: Array<string>, created_at: string, updated_at: string, assignees: Array<GitLabUser>, milestone: GitLabMilestone | null, };
+
+export type GitLabUser = { username: string, avatar_url: string | null, };
+
+export type GitLabMilestone = { title: string, iid: bigint, };
+
+export type ListGitLabIssuesParams = { state: string | null, labels: string | null, sort: string | null, order_by: string | null, per_page: number | null, page: number | null, };
+
+export type GitLabIssuesResponse = { issues: Array<GitLabIssue>, has_gitlab_config: boolean, };
+
+export type ImportGitLabIssueRequest = { issue_iid: bigint, auto_start: boolean | null, };
+
+export type ImportGitLabIssueResponse = { task: Task, issue: GitLabIssue, };
+
+export type GitLabConfigStatus = { has_project_url: boolean, has_token: boolean, project_url: string | null, sync_enabled: boolean, sync_labels: string | null, };
 
 export type RepoBranchStatus = { repo_id: string, repo_name: string, commits_behind: number | null, commits_ahead: number | null, has_uncommitted_changes: boolean | null, head_oid: string | null, uncommitted_count: number | null, untracked_count: number | null, target_branch_name: string, remote_commits_behind: number | null, remote_commits_ahead: number | null, merges: Array<Merge>, 
 /**

@@ -125,6 +125,38 @@ export interface ImportIssueResponse {
   issue: GitHubIssue;
 }
 
+export interface GitLabConfigStatus {
+  has_project_url: boolean;
+  has_token: boolean;
+  project_url: string | null;
+  sync_enabled: boolean;
+  sync_labels: string | null;
+}
+
+export interface GitLabIssue {
+  iid: number;
+  title: string;
+  description: string | null;
+  state: string;
+  web_url: string;
+  author: { username: string; avatar_url: string | null };
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+  assignees: { username: string; avatar_url: string | null }[];
+  milestone: { title: string; iid: number } | null;
+}
+
+export interface GitLabIssuesResponse {
+  issues: GitLabIssue[];
+  has_gitlab_config: boolean;
+}
+
+export interface ImportGitLabIssueResponse {
+  task: Task;
+  issue: GitLabIssue;
+}
+
 export class ApiError<E = unknown> extends Error {
   public status?: number;
   public error_data?: E;
@@ -461,6 +493,53 @@ export const projectsApi = {
       }
     );
     return handleApiResponse<ImportIssueResponse[]>(response);
+  },
+
+  getGitLabConfig: async (projectId: string): Promise<GitLabConfigStatus> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/gitlab/config`
+    );
+    return handleApiResponse<GitLabConfigStatus>(response);
+  },
+
+  listGitLabIssues: async (
+    projectId: string,
+    params?: { state?: string; labels?: string; page?: number; per_page?: number }
+  ): Promise<GitLabIssuesResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.state) searchParams.append('state', params.state);
+    if (params?.labels) searchParams.append('labels', params.labels);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+    const query = searchParams.toString();
+    const response = await makeRequest(
+      `/api/projects/${projectId}/gitlab/issues${query ? `?${query}` : ''}`
+    );
+    return handleApiResponse<GitLabIssuesResponse>(response);
+  },
+
+  importGitLabIssue: async (
+    projectId: string,
+    issueIid: number
+  ): Promise<ImportGitLabIssueResponse> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/gitlab/issues/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ issue_iid: issueIid }),
+      }
+    );
+    return handleApiResponse<ImportGitLabIssueResponse>(response);
+  },
+
+  syncGitLabIssues: async (projectId: string): Promise<ImportGitLabIssueResponse[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/gitlab/issues/sync`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<ImportGitLabIssueResponse[]>(response);
   },
 };
 

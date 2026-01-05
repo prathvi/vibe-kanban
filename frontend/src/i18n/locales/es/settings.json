@@ -415,6 +415,51 @@
           "importError": "Error al importar el issue",
           "syncError": "Error al sincronizar los issues"
         }
+      },
+      "gitlabIntegration": {
+        "title": "Integración de GitLab",
+        "description": "Importar issues desde GitLab y sincronizar automáticamente nuevos issues como tareas",
+        "projectUrl": {
+          "label": "URL del Proyecto",
+          "placeholder": "namespace/proyecto o https://gitlab.com/namespace/proyecto",
+          "helper": "Ingresa el proyecto de GitLab en formato namespace/proyecto"
+        },
+        "token": {
+          "label": "Token de Acceso Personal",
+          "placeholder": "glpat-xxxxxxxxxxxx",
+          "placeholderExisting": "Ingresa un nuevo token para reemplazar el existente",
+          "saved": "(guardado)",
+          "helper": "Crea un token con el alcance \"read_api\"",
+          "show": "Mostrar",
+          "hide": "Ocultar",
+          "settingsLink": "Configuración de GitLab"
+        },
+        "syncLabels": {
+          "label": "Filtrar por Etiquetas (opcional)",
+          "placeholder": "bug, mejora, se necesita ayuda",
+          "helper": "Lista de etiquetas separadas por comas para filtrar issues"
+        },
+        "autoSync": {
+          "label": "Habilitar sincronización automática",
+          "helper": "Importar automáticamente nuevos issues que coincidan con las etiquetas de filtro"
+        },
+        "buttons": {
+          "loadIssues": "Cargar Issues",
+          "syncNow": "Sincronizar Ahora",
+          "save": "Guardar Configuración de GitLab",
+          "import": "Importar"
+        },
+        "issues": {
+          "title": "Issues Abiertos",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "Configuración de GitLab guardada exitosamente",
+          "configureFirst": "Por favor configura primero la URL del proyecto y el token de GitLab",
+          "loadError": "Error al cargar los issues de GitLab",
+          "importError": "Error al importar el issue",
+          "syncError": "Error al sincronizar los issues"
+        }
       }
     }
   },

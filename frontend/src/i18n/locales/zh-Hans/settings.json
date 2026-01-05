@@ -415,6 +415,51 @@
           "importError": "导入议题失败",
           "syncError": "同步议题失败"
         }
+      },
+      "gitlabIntegration": {
+        "title": "GitLab 集成",
+        "description": "从 GitLab 导入议题并自动将新议题同步为任务",
+        "projectUrl": {
+          "label": "项目 URL",
+          "placeholder": "namespace/project 或 https://gitlab.com/namespace/project",
+          "helper": "以 namespace/project 格式输入 GitLab 项目"
+        },
+        "token": {
+          "label": "个人访问令牌",
+          "placeholder": "glpat-xxxxxxxxxxxx",
+          "placeholderExisting": "输入新令牌以替换现有令牌",
+          "saved": "(已保存)",
+          "helper": "创建具有 \"read_api\" 权限的令牌",
+          "show": "显示",
+          "hide": "隐藏",
+          "settingsLink": "GitLab 设置"
+        },
+        "syncLabels": {
+          "label": "按标签筛选（可选）",
+          "placeholder": "bug, enhancement, help wanted",
+          "helper": "用逗号分隔的标签列表来筛选议题"
+        },
+        "autoSync": {
+          "label": "启用自动同步",
+          "helper": "自动导入匹配筛选标签的新议题"
+        },
+        "buttons": {
+          "loadIssues": "加载议题",
+          "syncNow": "立即同步",
+          "save": "保存 GitLab 设置",
+          "import": "导入"
+        },
+        "issues": {
+          "title": "待处理议题",
+          "count": "({{count}})"
+        },
+        "messages": {
+          "success": "GitLab 设置保存成功",
+          "configureFirst": "请先配置 GitLab 项目 URL 和令牌",
+          "loadError": "加载 GitLab 议题失败",
+          "importError": "导入议题失败",
+          "syncError": "同步议题失败"
+        }
       }
     }
   },

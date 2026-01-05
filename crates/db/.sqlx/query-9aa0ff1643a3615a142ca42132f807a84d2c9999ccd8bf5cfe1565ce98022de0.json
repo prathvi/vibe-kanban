@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects\n               SET gitlab_last_sync_at = datetime('now')\n               WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9aa0ff1643a3615a142ca42132f807a84d2c9999ccd8bf5cfe1565ce98022de0"
+}

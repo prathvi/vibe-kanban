@@ -12,6 +12,7 @@ pub mod filesystem_watcher;
 pub mod git;
 pub mod github;
 pub mod github_issues;
+pub mod gitlab_issues;
 pub mod image;
 pub mod notification;
 pub mod oauth_credentials;

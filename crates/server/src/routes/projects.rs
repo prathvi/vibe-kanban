@@ -31,7 +31,7 @@ use utils::{
 };
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::ApiError, middleware::load_project_middleware, routes::github_issues};
+use crate::{DeploymentImpl, error::ApiError, middleware::load_project_middleware, routes::{github_issues, gitlab_issues}};
 
 #[derive(Deserialize, TS)]
 pub struct LinkToExistingRequest {
@@ -601,6 +601,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
             get(get_project_repositories).post(add_project_repository),
         )
         .merge(github_issues::router())
+        .merge(gitlab_issues::router())
         .layer(from_fn_with_state(
             deployment.clone(),
             load_project_middleware,
