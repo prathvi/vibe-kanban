@@ -28,6 +28,7 @@ export function ProcessLogsViewerContent({
     getScrollElement: () => parentRef.current,
     estimateSize: () => 28,
     overscan: 20,
+    measureElement: (element) => element.getBoundingClientRect().height,
   });
 
   // Check if user is at the bottom of the scroll
@@ -102,6 +103,8 @@ export function ProcessLogsViewerContent({
               return (
                 <div
                   key={virtualRow.index}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
                   style={{
                     position: 'absolute',
                     top: 0,
