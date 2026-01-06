@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle } from 'lucide-react';
 import { useLogStream } from '@/hooks/useLogStream';
 import RawLogText from '@/components/common/RawLogText';
 import type { PatchType } from 'shared/types';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
 
@@ -11,120 +15,179 @@ interface ProcessLogsViewerProps {
   processId: string;
 }
 
-export function ProcessLogsViewerContent({
-  logs,
-  error,
-}: {
+interface ProcessLogsViewerContentProps {
   logs: LogEntry[];
   error: string | null;
-}) {
-  const parentRef = useRef<HTMLDivElement>(null);
-  const didInitScroll = useRef(false);
-  const prevLenRef = useRef(0);
-  const [atBottom, setAtBottom] = useState(true);
+}
+
+// ============================================================================
+// LogLine Component - Renders a single log entry
+// ============================================================================
+
+interface LogLineProps {
+  entry: LogEntry;
+}
+
+const LogLine = memo(({ entry }: LogLineProps) => (
+  <RawLogText
+    content={entry.content}
+    channel={entry.type === 'STDERR' ? 'stderr' : 'stdout'}
+    className="text-sm px-4 py-1"
+  />
+));
+
+LogLine.displayName = 'LogLine';
+
+// ============================================================================
+// EmptyState Component - Shows when no logs available
+// ============================================================================
+
+const EmptyState = () => (
+  <div className="h-full flex items-center justify-center">
+    <p className="text-muted-foreground text-sm">No logs available</p>
+  </div>
+);
+
+// ============================================================================
+// ErrorState Component - Shows error messages
+// ============================================================================
+
+interface ErrorStateProps {
+  message: string;
+}
+
+const ErrorState = ({ message }: ErrorStateProps) => (
+  <div className="h-full flex items-center justify-center">
+    <div className="text-destructive text-sm flex items-center gap-2">
+      <AlertCircle className="h-4 w-4" />
+      <span>{message}</span>
+    </div>
+  </div>
+);
+
+// ============================================================================
+// VirtualLogList Component - Handles virtualized rendering of logs
+// ============================================================================
+
+interface VirtualLogListProps {
+  logs: LogEntry[];
+}
+
+const ESTIMATED_ROW_HEIGHT = 28;
+const OVERSCAN_COUNT = 15;
+
+const VirtualLogList = memo(({ logs }: VirtualLogListProps) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isInitialScrollDone = useRef(false);
+  const previousLogCount = useRef(0);
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
 
   const virtualizer = useVirtualizer({
     count: logs.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 24,
-    overscan: 20,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: OVERSCAN_COUNT,
   });
 
-  // Check if user is at the bottom of the scroll
-  const checkAtBottom = useCallback(() => {
-    const el = parentRef.current;
-    if (!el) return;
-    const threshold = 50;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-    setAtBottom(isAtBottom);
+  // Detect if user is scrolled to bottom
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    setIsUserAtBottom(distanceFromBottom < 50);
   }, []);
 
-  // 1) Initial jump to bottom once data appears.
+  // Initial scroll to bottom when logs first appear
   useEffect(() => {
-    if (!didInitScroll.current && logs.length > 0) {
-      didInitScroll.current = true;
+    if (!isInitialScrollDone.current && logs.length > 0) {
+      isInitialScrollDone.current = true;
       requestAnimationFrame(() => {
         virtualizer.scrollToIndex(logs.length - 1, { align: 'end' });
       });
     }
   }, [logs.length, virtualizer]);
 
-  // 2) Auto-scroll to bottom when new logs arrive (if user is at bottom)
+  // Auto-scroll to bottom when new logs arrive (only if user was at bottom)
   useEffect(() => {
-    const prev = prevLenRef.current;
-    const grewBy = logs.length - prev;
-    prevLenRef.current = logs.length;
+    const prevCount = previousLogCount.current;
+    const newLogsAdded = logs.length - prevCount;
+    previousLogCount.current = logs.length;
 
-    if (grewBy > 0 && atBottom && logs.length > 0) {
+    if (newLogsAdded > 0 && isUserAtBottom && logs.length > 0) {
       requestAnimationFrame(() => {
         virtualizer.scrollToIndex(logs.length - 1, { align: 'end' });
       });
     }
-  }, [logs.length, atBottom, virtualizer]);
+  }, [logs.length, isUserAtBottom, virtualizer]);
 
-  const formatLogLine = (entry: LogEntry, index: number) => {
-    return (
-      <RawLogText
-        key={index}
-        content={entry.content}
-        channel={entry.type === 'STDERR' ? 'stderr' : 'stdout'}
-        className="text-sm px-4 py-1"
-      />
-    );
-  };
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalHeight = virtualizer.getTotalSize();
 
   return (
-    <div className="h-full">
-      {logs.length === 0 && !error ? (
-        <div className="p-4 text-center text-muted-foreground text-sm">
-          No logs available
-        </div>
-      ) : error ? (
-        <div className="p-4 text-center text-destructive text-sm">
-          <AlertCircle className="h-4 w-4 inline mr-2" />
-          {error}
-        </div>
+    <div
+      ref={scrollContainerRef}
+      className="absolute inset-0 overflow-auto"
+      onScroll={handleScroll}
+    >
+      <div
+        className="relative w-full"
+        style={{ height: `${totalHeight}px` }}
+      >
+        {virtualItems.map((virtualRow) => {
+          const entry = logs[virtualRow.index];
+          return (
+            <div
+              key={virtualRow.index}
+              className="absolute left-0 w-full"
+              style={{ top: `${virtualRow.start}px` }}
+            >
+              <LogLine entry={entry} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
+
+VirtualLogList.displayName = 'VirtualLogList';
+
+// ============================================================================
+// ProcessLogsViewerContent - Main content component (exported for direct use)
+// ============================================================================
+
+export const ProcessLogsViewerContent = memo(({
+  logs,
+  error,
+}: ProcessLogsViewerContentProps) => {
+  // Determine what to render
+  const hasError = Boolean(error);
+  const isEmpty = logs.length === 0;
+
+  return (
+    <div className="relative h-full w-full">
+      {hasError ? (
+        <ErrorState message={error!} />
+      ) : isEmpty ? (
+        <EmptyState />
       ) : (
-        <div
-          ref={parentRef}
-          className="flex-1 rounded-lg h-full overflow-auto"
-          onScroll={checkAtBottom}
-        >
-          <div
-            style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const entry = logs[virtualRow.index];
-              return (
-                <div
-                  key={virtualRow.key}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: virtualRow.start,
-                    left: 0,
-                    width: '100%',
-                  }}
-                >
-                  {formatLogLine(entry, virtualRow.index)}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <VirtualLogList logs={logs} />
       )}
     </div>
   );
-}
+});
 
-export default function ProcessLogsViewer({
-  processId,
-}: ProcessLogsViewerProps) {
+ProcessLogsViewerContent.displayName = 'ProcessLogsViewerContent';
+
+// ============================================================================
+// ProcessLogsViewer - Main component with data fetching
+// ============================================================================
+
+const ProcessLogsViewer = ({ processId }: ProcessLogsViewerProps) => {
   const { logs, error } = useLogStream(processId);
   return <ProcessLogsViewerContent logs={logs} error={error} />;
-}
+};
+
+export default ProcessLogsViewer;
