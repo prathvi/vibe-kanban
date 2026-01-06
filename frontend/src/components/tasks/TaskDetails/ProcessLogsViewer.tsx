@@ -26,9 +26,8 @@ export function ProcessLogsViewerContent({
   const virtualizer = useVirtualizer({
     count: logs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => 24,
     overscan: 20,
-    measureElement: (element) => element.getBoundingClientRect().height,
   });
 
   // Check if user is at the bottom of the scroll
@@ -102,15 +101,14 @@ export function ProcessLogsViewerContent({
               const entry = logs[virtualRow.index];
               return (
                 <div
-                  key={virtualRow.index}
+                  key={virtualRow.key}
                   data-index={virtualRow.index}
                   ref={virtualizer.measureElement}
                   style={{
                     position: 'absolute',
-                    top: 0,
+                    top: virtualRow.start,
                     left: 0,
                     width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
                   {formatLogLine(entry, virtualRow.index)}
