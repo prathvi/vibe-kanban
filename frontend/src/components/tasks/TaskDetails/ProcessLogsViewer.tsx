@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle } from 'lucide-react';
-import { useLogStream } from '@/hooks/useLogStream';
+import { useLogStream, type LogEntry } from '@/hooks/useLogStream';
 import RawLogText from '@/components/common/RawLogText';
-import type { PatchType } from 'shared/types';
-
-type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
 
 interface ProcessLogsViewerProps {
   processId: string;
+}
+
+function estimateLogHeight(content: string): number {
+  const lineCount = content.split('\n').length;
+  const estimatedWraps = Math.ceil(content.length / 100);
+  const totalLines = Math.max(lineCount, estimatedWraps);
+  return Math.max(28, totalLines * 20 + 8);
 }
 
 export function ProcessLogsViewerContent({
@@ -22,12 +26,20 @@ export function ProcessLogsViewerContent({
   const didInitScroll = useRef(false);
   const prevLenRef = useRef(0);
   const [atBottom, setAtBottom] = useState(true);
+  const logsRef = useRef(logs);
+  logsRef.current = logs;
+
+  const getEstimatedSize = useCallback((index: number) => {
+    const content = logsRef.current[index]?.content ?? '';
+    return estimateLogHeight(content);
+  }, []);
 
   const virtualizer = useVirtualizer({
     count: logs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 24,
+    estimateSize: getEstimatedSize,
     overscan: 20,
+    getItemKey: (index) => index,
   });
 
   // Check if user is at the bottom of the scroll
@@ -106,9 +118,10 @@ export function ProcessLogsViewerContent({
                   ref={virtualizer.measureElement}
                   style={{
                     position: 'absolute',
-                    top: virtualRow.start,
+                    top: 0,
                     left: 0,
                     width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
                   {formatLogLine(entry, virtualRow.index)}

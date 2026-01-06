@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import type { PatchType } from 'shared/types';
 
-type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
+export type LogEntry = Extract<PatchType, { type: 'STDOUT' } | { type: 'STDERR' }>;
 
 interface UseLogStreamResult {
   logs: LogEntry[];
@@ -11,19 +11,45 @@ interface UseLogStreamResult {
 export const useLogStream = (processId: string): UseLogStreamResult => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
   const wsRef = useRef<WebSocket | null>(null);
   const retryCountRef = useRef<number>(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isIntentionallyClosed = useRef<boolean>(false);
+  
+  const pendingLogsRef = useRef<LogEntry[]>([]);
+  const flushScheduledRef = useRef<boolean>(false);
+  const logsBufferRef = useRef<LogEntry[]>([]);
+
+  const flushPendingLogs = useCallback(() => {
+    flushScheduledRef.current = false;
+    if (pendingLogsRef.current.length === 0) return;
+    
+    const newEntries = pendingLogsRef.current;
+    pendingLogsRef.current = [];
+    
+    logsBufferRef.current = [...logsBufferRef.current, ...newEntries];
+    setLogs(logsBufferRef.current);
+  }, []);
+
+  const queueLogEntry = useCallback((entry: LogEntry) => {
+    pendingLogsRef.current.push(entry);
+    
+    if (!flushScheduledRef.current) {
+      flushScheduledRef.current = true;
+      requestAnimationFrame(flushPendingLogs);
+    }
+  }, [flushPendingLogs]);
 
   useEffect(() => {
     if (!processId) {
       return;
     }
 
-    // Clear logs when process changes
     setLogs([]);
     setError(null);
+    logsBufferRef.current = [];
+    pendingLogsRef.current = [];
 
     const open = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -36,38 +62,28 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
 
       ws.onopen = () => {
         setError(null);
-        // Reset logs on new connection since server replays history
         setLogs([]);
+        logsBufferRef.current = [];
+        pendingLogsRef.current = [];
         retryCountRef.current = 0;
       };
 
-      const addLogEntry = (entry: LogEntry) => {
-        setLogs((prev) => [...prev, entry]);
-      };
-
-      // Handle WebSocket messages
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
 
-          // Handle different message types based on LogMsg enum
           if ('JsonPatch' in data) {
             const patches = data.JsonPatch as Array<{ value?: PatchType }>;
-            patches.forEach((patch) => {
+            for (const patch of patches) {
               const value = patch?.value;
-              if (!value || !value.type) return;
+              if (!value || !value.type) continue;
 
-              switch (value.type) {
-                case 'STDOUT':
-                case 'STDERR':
-                  addLogEntry({ type: value.type, content: value.content });
-                  break;
-                // Ignore other patch types (NORMALIZED_ENTRY, DIFF, etc.)
-                default:
-                  break;
+              if (value.type === 'STDOUT' || value.type === 'STDERR') {
+                queueLogEntry({ type: value.type, content: value.content });
               }
-            });
+            }
           } else if (data.finished === true) {
+            flushPendingLogs();
             isIntentionallyClosed.current = true;
             ws.close();
           }
@@ -81,7 +97,6 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
       };
 
       ws.onclose = (event) => {
-        // Only retry if the close was not intentional and not a normal closure
         if (!isIntentionallyClosed.current && event.code !== 1000) {
           const next = retryCountRef.current + 1;
           retryCountRef.current = next;
@@ -106,7 +121,7 @@ export const useLogStream = (processId: string): UseLogStreamResult => {
         retryTimerRef.current = null;
       }
     };
-  }, [processId]);
+  }, [processId, queueLogEntry, flushPendingLogs]);
 
   return { logs, error };
 };
