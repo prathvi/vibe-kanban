@@ -152,7 +152,10 @@ impl User {
         .await
     }
 
-    pub async fn find_by_username(pool: &SqlitePool, username: &str) -> Result<Option<Self>, sqlx::Error> {
+    pub async fn find_by_username(
+        pool: &SqlitePool,
+        username: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             User,
             r#"SELECT id as "id!: Uuid",
@@ -346,11 +349,9 @@ impl UserSession {
     }
 
     pub async fn delete_expired(pool: &SqlitePool) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query!(
-            "DELETE FROM user_sessions WHERE expires_at < datetime('now')"
-        )
-        .execute(pool)
-        .await?;
+        let result = sqlx::query!("DELETE FROM user_sessions WHERE expires_at < datetime('now')")
+            .execute(pool)
+            .await?;
         Ok(result.rows_affected())
     }
 

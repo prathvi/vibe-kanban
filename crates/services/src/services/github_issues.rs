@@ -89,7 +89,7 @@ impl GitHubIssuesService {
 
     pub fn parse_repo_url(url: &str) -> Result<(String, String), GitHubIssuesError> {
         let url = url.trim();
-        
+
         if url.contains('/') && !url.contains("://") && !url.contains('@') {
             let parts: Vec<&str> = url.split('/').collect();
             if parts.len() == 2 {
@@ -97,14 +97,18 @@ impl GitHubIssuesService {
             }
         }
 
-        let re = regex::Regex::new(r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/\s]+?)(?:\.git)?(?:/|$|\s)")
-            .map_err(|_| GitHubIssuesError::InvalidRepoUrl(url.to_string()))?;
+        let re = regex::Regex::new(
+            r"github\.com[:/](?P<owner>[^/]+)/(?P<repo>[^/\s]+?)(?:\.git)?(?:/|$|\s)",
+        )
+        .map_err(|_| GitHubIssuesError::InvalidRepoUrl(url.to_string()))?;
 
         if let Some(caps) = re.captures(url) {
-            let owner = caps.name("owner")
+            let owner = caps
+                .name("owner")
                 .map(|m| m.as_str().to_string())
                 .ok_or_else(|| GitHubIssuesError::InvalidRepoUrl(url.to_string()))?;
-            let repo = caps.name("repo")
+            let repo = caps
+                .name("repo")
                 .map(|m| m.as_str().to_string())
                 .ok_or_else(|| GitHubIssuesError::InvalidRepoUrl(url.to_string()))?;
             return Ok((owner, repo));
@@ -122,7 +126,8 @@ impl GitHubIssuesService {
     ) -> Result<Vec<GitHubIssue>, GitHubIssuesError> {
         let url = format!("{}/repos/{}/{}/issues", GITHUB_API_BASE, owner, repo);
 
-        let mut request = self.client
+        let mut request = self
+            .client
             .get(&url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Accept", "application/vnd.github+json")
@@ -152,7 +157,10 @@ impl GitHubIssuesService {
         let status = response.status();
 
         if !status.is_success() {
-            let message = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(GitHubIssuesError::Api {
                 status: status.as_u16(),
                 message,
@@ -160,7 +168,8 @@ impl GitHubIssuesService {
         }
 
         let issues: Vec<GitHubIssue> = response.json().await?;
-        let issues = issues.into_iter()
+        let issues = issues
+            .into_iter()
             .filter(|issue| !issue.html_url.contains("/pull/"))
             .collect();
 
@@ -174,9 +183,13 @@ impl GitHubIssuesService {
         repo: &str,
         issue_number: i64,
     ) -> Result<GitHubIssue, GitHubIssuesError> {
-        let url = format!("{}/repos/{}/{}/issues/{}", GITHUB_API_BASE, owner, repo, issue_number);
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}",
+            GITHUB_API_BASE, owner, repo, issue_number
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("Authorization", format!("Bearer {}", token))
             .header("Accept", "application/vnd.github+json")
@@ -188,7 +201,10 @@ impl GitHubIssuesService {
         let status = response.status();
 
         if !status.is_success() {
-            let message = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(GitHubIssuesError::Api {
                 status: status.as_u16(),
                 message,

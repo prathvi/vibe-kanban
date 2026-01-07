@@ -23,14 +23,14 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Trash2, Github, GitlabIcon, RefreshCw, ExternalLink } from 'lucide-react';
+import { Loader2, Plus, Trash2, Github, GitlabIcon, RefreshCw, ExternalLink, Zap } from 'lucide-react';
 import { useProjects } from '@/hooks/useProjects';
 import { useProjectMutations } from '@/hooks/useProjectMutations';
 import { useScriptPlaceholders } from '@/hooks/useScriptPlaceholders';
 import { CopyFilesField } from '@/components/projects/CopyFilesField';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { RepoPickerDialog } from '@/components/dialogs/shared/RepoPickerDialog';
-import { projectsApi, GitHubIssue, GitLabIssue } from '@/lib/api';
+import { projectsApi, GitHubIssue, GitLabIssue, VortexIssue } from '@/lib/api';
 import { repoBranchKeys } from '@/hooks/useRepoBranches';
 import type { Project, ProjectRepo, Repo, UpdateProject } from 'shared/types';
 
@@ -60,6 +60,13 @@ interface GitLabFormState {
   gitlab_token: string;
   gitlab_sync_enabled: boolean;
   gitlab_sync_labels: string;
+}
+
+interface VortexFormState {
+  vortex_project_id: string;
+  vortex_token: string;
+  vortex_sync_enabled: boolean;
+  vortex_sync_labels: string;
 }
 
 function projectToFormState(project: Project): ProjectFormState {
@@ -159,6 +166,21 @@ export function ProjectSettings() {
   const [syncingGitlabIssues, setSyncingGitlabIssues] = useState(false);
   const [showGitlabToken, setShowGitlabToken] = useState(false);
   const [hasExistingGitlabToken, setHasExistingGitlabToken] = useState(false);
+
+  const [vortexDraft, setVortexDraft] = useState<VortexFormState>({
+    vortex_project_id: '',
+    vortex_token: '',
+    vortex_sync_enabled: false,
+    vortex_sync_labels: '',
+  });
+  const [savingVortex, setSavingVortex] = useState(false);
+  const [vortexSuccess, setVortexSuccess] = useState(false);
+  const [vortexError, setVortexError] = useState<string | null>(null);
+  const [vortexIssues, setVortexIssues] = useState<VortexIssue[]>([]);
+  const [loadingVortexIssues, setLoadingVortexIssues] = useState(false);
+  const [syncingVortexIssues, setSyncingVortexIssues] = useState(false);
+  const [showVortexToken, setShowVortexToken] = useState(false);
+  const [hasExistingVortexToken, setHasExistingVortexToken] = useState(false);
 
   // Get OS-appropriate script placeholders
   const placeholders = useScriptPlaceholders();
@@ -366,6 +388,21 @@ export function ProjectSettings() {
       .catch(() => {
         setHasExistingGitlabToken(false);
       });
+
+    projectsApi
+      .getVortexConfig(selectedProjectId)
+      .then((config) => {
+        setVortexDraft({
+          vortex_project_id: config.project_id ?? '',
+          vortex_token: '',
+          vortex_sync_enabled: config.sync_enabled,
+          vortex_sync_labels: config.sync_labels ?? '',
+        });
+        setHasExistingVortexToken(config.has_token);
+      })
+      .catch(() => {
+        setHasExistingVortexToken(false);
+      });
   }, [selectedProjectId]);
 
   useEffect(() => {
@@ -494,6 +531,11 @@ export function ProjectSettings() {
         gitlab_token: null,
         gitlab_sync_enabled: null,
         gitlab_sync_labels: null,
+        vortex_api_url: null,
+        vortex_project_id: null,
+        vortex_token: null,
+        vortex_sync_enabled: null,
+        vortex_sync_labels: null,
       };
 
       updateProject.mutate({
@@ -570,6 +612,10 @@ export function ProjectSettings() {
     setGitlabDraft((prev) => ({ ...prev, ...updates }));
   };
 
+  const updateVortexDraft = (updates: Partial<VortexFormState>) => {
+    setVortexDraft((prev) => ({ ...prev, ...updates }));
+  };
+
   const handleSaveGithub = async () => {
     if (!selectedProject) return;
 
@@ -591,6 +637,11 @@ export function ProjectSettings() {
         gitlab_token: null,
         gitlab_sync_enabled: null,
         gitlab_sync_labels: null,
+        vortex_api_url: null,
+        vortex_project_id: null,
+        vortex_token: null,
+        vortex_sync_enabled: null,
+        vortex_sync_labels: null,
       };
 
       await projectsApi.update(selectedProject.id, updateData);
@@ -688,6 +739,11 @@ export function ProjectSettings() {
         gitlab_token: gitlabDraft.gitlab_token.trim() || null,
         gitlab_sync_enabled: gitlabDraft.gitlab_sync_enabled,
         gitlab_sync_labels: gitlabDraft.gitlab_sync_labels.trim() || null,
+        vortex_api_url: null,
+        vortex_project_id: null,
+        vortex_token: null,
+        vortex_sync_enabled: null,
+        vortex_sync_labels: null,
       };
 
       await projectsApi.update(selectedProject.id, updateData);
@@ -761,6 +817,108 @@ export function ProjectSettings() {
       );
     } finally {
       setSyncingGitlabIssues(false);
+    }
+  };
+
+  const handleSaveVortex = async () => {
+    if (!selectedProject) return;
+
+    setSavingVortex(true);
+    setVortexError(null);
+    setVortexSuccess(false);
+
+    try {
+      const updateData: UpdateProject = {
+        name: selectedProject.name,
+        dev_script: selectedProject.dev_script ?? null,
+        dev_script_working_dir: selectedProject.dev_script_working_dir ?? null,
+        default_agent_working_dir: selectedProject.default_agent_working_dir ?? null,
+        github_repo_url: null,
+        github_token: null,
+        github_sync_enabled: null,
+        github_sync_labels: null,
+        gitlab_project_url: null,
+        gitlab_token: null,
+        gitlab_sync_enabled: null,
+        gitlab_sync_labels: null,
+        vortex_api_url: null,
+        vortex_project_id: vortexDraft.vortex_project_id.trim() || null,
+        vortex_token: vortexDraft.vortex_token.trim() || null,
+        vortex_sync_enabled: vortexDraft.vortex_sync_enabled,
+        vortex_sync_labels: vortexDraft.vortex_sync_labels.trim() || null,
+      };
+
+      await projectsApi.update(selectedProject.id, updateData);
+      setVortexSuccess(true);
+      if (vortexDraft.vortex_token.trim()) {
+        setHasExistingVortexToken(true);
+      }
+      setVortexDraft((prev) => ({ ...prev, vortex_token: '' }));
+      setTimeout(() => setVortexSuccess(false), 3000);
+    } catch (err) {
+      setVortexError(
+        err instanceof Error ? err.message : 'Failed to save Vortex settings'
+      );
+    } finally {
+      setSavingVortex(false);
+    }
+  };
+
+  const handleLoadVortexIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setLoadingVortexIssues(true);
+    setVortexError(null);
+
+    try {
+      const response = await projectsApi.listVortexIssues(selectedProjectId);
+      if (!response.has_vortex_config) {
+        setVortexError('Please configure Vortex settings first');
+        setVortexIssues([]);
+      } else {
+        setVortexIssues(response.issues);
+      }
+    } catch (err) {
+      setVortexError(
+        err instanceof Error ? err.message : 'Failed to load Vortex issues'
+      );
+    } finally {
+      setLoadingVortexIssues(false);
+    }
+  };
+
+  const handleImportVortexIssue = async (issueId: string) => {
+    if (!selectedProjectId) return;
+
+    try {
+      await projectsApi.importVortexIssue(selectedProjectId, issueId);
+      setVortexIssues((prev) => prev.filter((i) => i.id !== issueId));
+    } catch (err) {
+      setVortexError(
+        err instanceof Error ? err.message : 'Failed to import Vortex issue'
+      );
+    }
+  };
+
+  const handleSyncVortexIssues = async () => {
+    if (!selectedProjectId) return;
+
+    setSyncingVortexIssues(true);
+    setVortexError(null);
+
+    try {
+      const imported = await projectsApi.syncVortexIssues(selectedProjectId);
+      if (imported.length > 0) {
+        setVortexSuccess(true);
+        setTimeout(() => setVortexSuccess(false), 3000);
+      }
+      await handleLoadVortexIssues();
+    } catch (err) {
+      setVortexError(
+        err instanceof Error ? err.message : 'Failed to sync Vortex issues'
+      );
+    } finally {
+      setSyncingVortexIssues(false);
     }
   };
 
@@ -1642,6 +1800,209 @@ export function ProjectSettings() {
                           onClick={() => handleImportGitlabIssue(issue.iid)}
                         >
                           {t('settings.projects.gitlabIntegration.buttons.import')}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Vortex Integration
+              </CardTitle>
+              <CardDescription>
+                Import issues from Vortex issue tracker
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {vortexError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{vortexError}</AlertDescription>
+                </Alert>
+              )}
+
+              {vortexSuccess && (
+                <Alert variant="success">
+                  <AlertDescription className="font-medium">
+                    Vortex settings saved successfully
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="vortex-project-id">
+                  Vortex Project ID
+                </Label>
+                <Input
+                  id="vortex-project-id"
+                  value={vortexDraft.vortex_project_id}
+                  onChange={(e) =>
+                    updateVortexDraft({ vortex_project_id: e.target.value })
+                  }
+                  placeholder="PROJECT-KEY"
+                  className="font-mono"
+                />
+                <p className="text-sm text-muted-foreground">
+                  The project key or ID in Vortex
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="vortex-token">
+                    Vortex API Token
+                  </Label>
+                  {hasExistingVortexToken && !vortexDraft.vortex_token && (
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      Token saved
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="vortex-token"
+                    type={showVortexToken ? 'text' : 'password'}
+                    value={vortexDraft.vortex_token}
+                    onChange={(e) =>
+                      updateVortexDraft({ vortex_token: e.target.value })
+                    }
+                    placeholder={
+                      hasExistingVortexToken
+                        ? 'Enter new token to replace existing'
+                        : 'Enter your Vortex API token'
+                    }
+                    className="font-mono"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => setShowVortexToken(!showVortexToken)}
+                  >
+                    {showVortexToken ? 'Hide' : 'Show'}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  API token for authenticating with Vortex
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vortex-sync-labels">
+                  Sync Labels
+                </Label>
+                <Input
+                  id="vortex-sync-labels"
+                  value={vortexDraft.vortex_sync_labels}
+                  onChange={(e) =>
+                    updateVortexDraft({ vortex_sync_labels: e.target.value })
+                  }
+                  placeholder="bug, feature, priority:high"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Only sync issues with these labels (comma-separated)
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="vortex-sync-enabled"
+                  checked={vortexDraft.vortex_sync_enabled}
+                  onCheckedChange={(checked) =>
+                    updateVortexDraft({ vortex_sync_enabled: checked })
+                  }
+                />
+                <Label htmlFor="vortex-sync-enabled" className="cursor-pointer">
+                  Enable Auto-Sync
+                </Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Automatically sync issues when the project loads
+              </p>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadVortexIssues}
+                    disabled={loadingVortexIssues || !vortexDraft.vortex_project_id}
+                  >
+                    {loadingVortexIssues && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Load Issues
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSyncVortexIssues}
+                    disabled={syncingVortexIssues || !vortexDraft.vortex_project_id}
+                  >
+                    {syncingVortexIssues ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Sync Now
+                  </Button>
+                </div>
+                <Button
+                  onClick={handleSaveVortex}
+                  disabled={savingVortex}
+                >
+                  {savingVortex && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Save Settings
+                </Button>
+              </div>
+
+              {vortexIssues.length > 0 && (
+                <div className="pt-4 border-t">
+                  <Label className="mb-3 block">
+                    Available Issues ({vortexIssues.length})
+                  </Label>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {vortexIssues.map((issue) => (
+                      <div
+                        key={issue.id}
+                        className="flex items-center justify-between p-3 border rounded-md"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">
+                            {issue.key} {issue.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{issue.status}</span>
+                            {issue.priority && (
+                              <span className="px-1.5 py-0.5 text-xs rounded bg-muted">
+                                {issue.priority}
+                              </span>
+                            )}
+                            {issue.labels.length > 0 && (
+                              <div className="flex gap-1">
+                                {issue.labels.slice(0, 3).map((label) => (
+                                  <span
+                                    key={label}
+                                    className="px-1.5 py-0.5 text-xs rounded bg-muted"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImportVortexIssue(issue.id)}
+                        >
+                          Import
                         </Button>
                       </div>
                     ))}

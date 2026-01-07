@@ -801,7 +801,9 @@ impl GitService {
         if task_behind > 0 {
             tracing::info!(
                 "Base branch '{}' is {} commits ahead of task branch '{}'. Attempting to rebase task branch first.",
-                base_branch_name, task_behind, task_branch_name
+                base_branch_name,
+                task_behind,
+                task_branch_name
             );
 
             // Try to rebase task branch onto base branch before merging
@@ -816,7 +818,8 @@ impl GitService {
                 Ok(_) => {
                     tracing::info!(
                         "Successfully rebased task branch '{}' onto '{}'",
-                        task_branch_name, base_branch_name
+                        task_branch_name,
+                        base_branch_name
                     );
                 }
                 Err(GitServiceError::MergeConflicts(msg)) => {
@@ -1331,9 +1334,7 @@ impl GitService {
 
         // If there are conflicts, resolve them in favor of the task branch (theirs)
         if index.has_conflicts() {
-            tracing::warn!(
-                "Merge has conflicts, auto-resolving in favor of task branch changes"
-            );
+            tracing::warn!("Merge has conflicts, auto-resolving in favor of task branch changes");
 
             // Collect all conflict entries and resolve them
             let conflicts: Vec<_> = index.conflicts()?.collect();
@@ -1554,6 +1555,34 @@ impl GitService {
 
         repo.set_head(&format!("refs/heads/{new_branch_name}"))?;
 
+        Ok(())
+    }
+
+    /// Create a new branch from a base branch
+    pub fn create_branch(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+        base_branch: &str,
+    ) -> Result<(), GitServiceError> {
+        let git = GitCli::new();
+        git.git(repo_path, ["branch", branch_name, base_branch])
+            .map_err(|e| {
+                GitServiceError::InvalidRepository(format!("Failed to create branch: {e}"))
+            })?;
+        Ok(())
+    }
+
+    /// Checkout an existing branch
+    pub fn checkout_branch(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+    ) -> Result<(), GitServiceError> {
+        let git = GitCli::new();
+        git.git(repo_path, ["checkout", branch_name]).map_err(|e| {
+            GitServiceError::InvalidRepository(format!("Failed to checkout branch: {e}"))
+        })?;
         Ok(())
     }
 

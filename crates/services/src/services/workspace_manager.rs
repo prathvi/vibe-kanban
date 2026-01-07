@@ -155,9 +155,7 @@ impl WorkspaceManager {
                     let _ = tokio::fs::remove_dir_all(&symlink_path).await;
                 }
             }
-            if let Err(e) =
-                tokio::fs::symlink(&worktree.worktree_path, &symlink_path).await
-            {
+            if let Err(e) = tokio::fs::symlink(&worktree.worktree_path, &symlink_path).await {
                 warn!(
                     "Failed to create symlink {} -> {}: {}",
                     symlink_path.display(),

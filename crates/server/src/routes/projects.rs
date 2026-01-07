@@ -31,7 +31,12 @@ use utils::{
 };
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::ApiError, middleware::load_project_middleware, routes::{github_issues, gitlab_issues}};
+use crate::{
+    DeploymentImpl,
+    error::ApiError,
+    middleware::load_project_middleware,
+    routes::{github_issues, gitlab_issues, vortex_issues},
+};
 
 #[derive(Deserialize, TS)]
 pub struct LinkToExistingRequest {
@@ -602,6 +607,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         )
         .merge(github_issues::router())
         .merge(gitlab_issues::router())
+        .merge(vortex_issues::router())
         .layer(from_fn_with_state(
             deployment.clone(),
             load_project_middleware,

@@ -72,10 +72,12 @@ import { AttemptHeaderActions } from '@/components/panels/AttemptHeaderActions';
 import { TaskPanelHeaderActions } from '@/components/panels/TaskPanelHeaderActions';
 
 import type { TaskWithAttemptStatus, TaskStatus } from 'shared/types';
+import type { KanbanColumnStatus } from '@/utils/statusLabels';
 
 type Task = TaskWithAttemptStatus;
 
-const TASK_STATUSES = [
+const TASK_STATUSES: readonly KanbanColumnStatus[] = [
+  'queue',
   'todo',
   'inprogress',
   'inreview',
@@ -359,7 +361,8 @@ export function ProjectTasks() {
   }, [selectedSharedTaskId, sharedTasksById, showSharedTasks, userId]);
 
   const kanbanColumns = useMemo(() => {
-    const columns: Record<TaskStatus, KanbanColumnItem[]> = {
+    const columns: Record<KanbanColumnStatus, KanbanColumnItem[]> = {
+      queue: [],
       todo: [],
       inprogress: [],
       inreview: [],
@@ -400,7 +403,12 @@ export function ProjectTasks() {
         return;
       }
 
-      columns[statusKey].push({
+      // Sequential tasks go in the queue column (only if todo status)
+      const isSequentialTask = task.execution_mode === 'sequential';
+      const targetColumn =
+        isSequentialTask && statusKey === 'todo' ? 'queue' : statusKey;
+
+      columns[targetColumn].push({
         type: 'task',
         task,
         sharedTask,
@@ -435,8 +443,21 @@ export function ProjectTasks() {
       return new Date(createdAt).getTime();
     };
 
-    TASK_STATUSES.forEach((status) => {
-      columns[status].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+    // Sort all columns except queue by timestamp
+    (
+      Object.keys(columns) as KanbanColumnStatus[]
+    ).forEach((status) => {
+      if (status === 'queue') {
+        // Sort queue by queue_position
+        columns.queue.sort((a, b) => {
+          if (a.type !== 'task' || b.type !== 'task') return 0;
+          const posA = a.task.queue_position ?? Infinity;
+          const posB = b.task.queue_position ?? Infinity;
+          return posA - posB;
+        });
+      } else {
+        columns[status].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+      }
     });
 
     return columns;
@@ -451,7 +472,8 @@ export function ProjectTasks() {
   ]);
 
   const visibleTasksByStatus = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
+    const map: Record<KanbanColumnStatus, Task[]> = {
+      queue: [],
       todo: [],
       inprogress: [],
       inreview: [],
@@ -752,15 +774,55 @@ export function ProjectTasks() {
       if (!over || !active.data.current) return;
 
       const draggedTaskId = active.id as string;
-      const newStatus = over.id as Task['status'];
       const task = tasksById[draggedTaskId];
-      if (!task || task.status === newStatus) return;
+      if (!task) return;
+
+      // Check if dropping on a task (for reordering) or on a column
+      const overId = over.id as string;
+      const overTask = tasksById[overId];
+
+      // Determine current column for the dragged task
+      const currentColumn = task.execution_mode === 'sequential' && task.status === 'todo' ? 'queue' : task.status;
+
+      // If dropping on another task within the queue column, handle reordering
+      if (overTask && currentColumn === 'queue' && overTask.execution_mode === 'sequential' && overTask.status === 'todo') {
+        // Reordering within queue
+        const overPosition = overTask.queue_position ?? 1;
+        try {
+          await tasksApi.reorderQueue(draggedTaskId, overPosition);
+        } catch (err) {
+          console.error('Failed to reorder queue:', err);
+        }
+        return;
+      }
+
+      // Otherwise, handle as column change
+      const targetColumn = overId as KanbanColumnStatus;
+
+      // Determine what's changing
+      const isMovingToQueue = targetColumn === 'queue';
+      const isMovingFromQueue = task.execution_mode === 'sequential' && targetColumn !== 'queue';
+
+      // Map target column to actual status
+      const newStatus: TaskStatus = targetColumn === 'queue' ? 'todo' : (targetColumn as TaskStatus);
+
+      // Skip if nothing is changing
+      if (currentColumn === targetColumn) return;
 
       try {
+        let executionMode: 'parallel' | 'sequential' | null = null;
+
+        if (isMovingToQueue) {
+          executionMode = 'sequential';
+        } else if (isMovingFromQueue) {
+          executionMode = 'parallel';
+        }
+
         await tasksApi.update(draggedTaskId, {
           title: task.title,
           description: task.description,
           status: newStatus,
+          execution_mode: executionMode,
           parent_workspace_id: task.parent_workspace_id,
           image_ids: null,
         });

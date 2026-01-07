@@ -96,7 +96,8 @@ impl GitLabIssuesService {
             .map_err(|_| GitLabIssuesError::InvalidProjectUrl(url.to_string()))?;
 
         if let Some(caps) = re.captures(url) {
-            let path = caps.name("path")
+            let path = caps
+                .name("path")
                 .map(|m| m.as_str().trim_end_matches('/').to_string())
                 .ok_or_else(|| GitLabIssuesError::InvalidProjectUrl(url.to_string()))?;
             return Ok(urlencoding::encode(&path).to_string());
@@ -113,7 +114,8 @@ impl GitLabIssuesService {
     ) -> Result<Vec<GitLabIssue>, GitLabIssuesError> {
         let url = format!("{}/projects/{}/issues", GITLAB_API_BASE, project_path);
 
-        let mut request = self.client
+        let mut request = self
+            .client
             .get(&url)
             .header("PRIVATE-TOKEN", token)
             .header("Accept", "application/json")
@@ -142,7 +144,10 @@ impl GitLabIssuesService {
         let status = response.status();
 
         if !status.is_success() {
-            let message = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(GitLabIssuesError::Api {
                 status: status.as_u16(),
                 message,
@@ -159,9 +164,13 @@ impl GitLabIssuesService {
         project_path: &str,
         issue_iid: i64,
     ) -> Result<GitLabIssue, GitLabIssuesError> {
-        let url = format!("{}/projects/{}/issues/{}", GITLAB_API_BASE, project_path, issue_iid);
+        let url = format!(
+            "{}/projects/{}/issues/{}",
+            GITLAB_API_BASE, project_path, issue_iid
+        );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("PRIVATE-TOKEN", token)
             .header("Accept", "application/json")
@@ -172,7 +181,10 @@ impl GitLabIssuesService {
         let status = response.status();
 
         if !status.is_success() {
-            let message = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(GitLabIssuesError::Api {
                 status: status.as_u16(),
                 message,

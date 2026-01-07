@@ -80,16 +80,10 @@ where
             .map_err(|_| AuthError::InvalidToken)?;
 
         // Parse user ID
-        let user_id: Uuid = claims
-            .sub
-            .parse()
-            .map_err(|_| AuthError::InvalidToken)?;
+        let user_id: Uuid = claims.sub.parse().map_err(|_| AuthError::InvalidToken)?;
 
         // Parse role
-        let role = claims
-            .role
-            .parse()
-            .map_err(|_| AuthError::InvalidToken)?;
+        let role = claims.role.parse().map_err(|_| AuthError::InvalidToken)?;
 
         Ok(AuthUser {
             id: user_id,

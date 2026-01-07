@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use utils::{
     jwt::{
-        create_access_token, create_refresh_token, validate_refresh_token,
-        ACCESS_TOKEN_EXPIRY_SECS, REFRESH_TOKEN_EXPIRY_SECS,
+        ACCESS_TOKEN_EXPIRY_SECS, REFRESH_TOKEN_EXPIRY_SECS, create_access_token,
+        create_refresh_token, validate_refresh_token,
     },
     password::{hash_password, verify_password},
     response::ApiResponse,
@@ -112,8 +112,8 @@ async fn register(
     };
 
     // Hash password
-    let password_hash =
-        hash_password(&payload.password).map_err(|_| ApiError::BadRequest("Failed to hash password".to_string()))?;
+    let password_hash = hash_password(&payload.password)
+        .map_err(|_| ApiError::BadRequest("Failed to hash password".to_string()))?;
 
     // Create user
     let user = User::create(
@@ -269,8 +269,9 @@ async fn refresh(
     )
     .map_err(|e| ApiError::BadRequest(format!("Failed to create access token: {}", e)))?;
 
-    let new_refresh_token = create_refresh_token(user.id, &jwt_secret, REFRESH_TOKEN_EXPIRY_SECS)
-        .map_err(|e| ApiError::BadRequest(format!("Failed to create refresh token: {}", e)))?;
+    let new_refresh_token =
+        create_refresh_token(user.id, &jwt_secret, REFRESH_TOKEN_EXPIRY_SECS)
+            .map_err(|e| ApiError::BadRequest(format!("Failed to create refresh token: {}", e)))?;
 
     // Store new refresh token
     let expires_at = Utc::now() + Duration::seconds(REFRESH_TOKEN_EXPIRY_SECS);

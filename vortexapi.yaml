@@ -1,0 +1,5592 @@
+openapi: 3.0.3
+info:
+  title: Vortex Issue Tracker API
+  description: RESTful API for Vortex Issue Tracking Platform
+  version: 1.0.0
+  contact:
+    name: Vortex API Support
+    url: https://vortextask.com
+
+servers:
+  - url: https://api.vortextask.com
+    description: Production server
+  - url: http://localhost:8787
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User management
+  - name: Workspaces
+    description: Workspace management
+  - name: Projects
+    description: Project management
+  - name: Issues
+    description: Issue tracking
+  - name: Comments
+    description: Issue comments
+  - name: Components
+    description: Project components
+  - name: Custom Fields
+    description: Custom field definitions
+  - name: Notifications
+    description: User notifications
+  - name: Files
+    description: File attachments
+  - name: Webhooks
+    description: Webhook management
+  - name: Admin
+    description: Admin-only user management and statistics
+  - name: Real-time
+    description: WebSocket connections and presence for real-time updates
+  - name: Search
+    description: Full-text search and search suggestions
+  - name: Analytics
+    description: Dashboard statistics, trends, and performance metrics
+  - name: Export
+    description: Export issues and reports to CSV or JSON
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [Admin, Manager, Developer, Tester, Viewer]
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        timezone:
+          type: string
+          default: UTC
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        storage_policy:
+          type: object
+          properties:
+            maxFileSizeMB:
+              type: number
+            allowedMimeTypes:
+              type: array
+              items:
+                type: string
+            retentionDays:
+              type: integer
+        storagePolicy:
+          type: object
+          description: Parsed storage_policy JSON
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        key:
+          type: string
+          description: Project key (e.g., VRX, MOB)
+        status:
+          type: string
+          enum: [Active, On Hold, Archived]
+        owner_id:
+          type: string
+        workflow:
+          type: array
+          items:
+            type: string
+          description: Custom workflow stages
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Issue:
+      type: object
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        project_id:
+          type: string
+        key:
+          type: string
+          description: Issue key (e.g., VRX-101)
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [Bug, Task, Story, Epic, Incident, Feature, Research]
+        status:
+          type: string
+        priority:
+          type: string
+          enum: [P0 - Critical, P1 - High, P2 - Medium, P3 - Low]
+        severity:
+          type: string
+          enum: [Blocker, Major, Minor, Trivial]
+        assignee_id:
+          type: string
+          nullable: true
+        reporter_id:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        labels:
+          type: array
+          items:
+            type: string
+        custom_fields:
+          type: array
+          items:
+            type: object
+        components:
+          type: array
+          items:
+            type: object
+        subtasks:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        issue_id:
+          type: string
+        user_id:
+          type: string
+        content:
+          type: string
+        parent_id:
+          type: string
+          nullable: true
+        reactions:
+          type: object
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    CustomField:
+      type: object
+      properties:
+        id:
+          type: string
+        workspace_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [text, number, select, boolean, date]
+        options:
+          type: array
+          items:
+            type: string
+          nullable: true
+        required:
+          type: integer
+          enum: [0, 1]
+        created_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        type:
+          type: string
+          enum: [mention, assignment, status_change, comment, issue.assigned, comment.mention, issue.status_changed, comment.created]
+        title:
+          type: string
+        message:
+          type: string
+        issue_id:
+          type: string
+          nullable: true
+        issueId:
+          type: string
+          nullable: true
+          description: Alias for issue_id in response
+        metadata:
+          type: object
+          nullable: true
+          description: Additional metadata about the notification
+        read:
+          type: integer
+          enum: [0, 1]
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when notification was read
+        created_at:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+          description: Alias for created_at in response
+
+    NotificationPreferences:
+      type: object
+      properties:
+        emailOnAssignment:
+          type: boolean
+          default: true
+          description: Send email when assigned to an issue
+        emailOnMention:
+          type: boolean
+          default: true
+          description: Send email when mentioned in a comment
+        emailOnStatusChange:
+          type: boolean
+          default: true
+          description: Send email when a watched issue status changes
+        emailOnComment:
+          type: boolean
+          default: false
+          description: Send email when someone comments on a watched issue
+        dailyDigest:
+          type: boolean
+          default: true
+          description: Receive daily digest email
+        inAppNotifications:
+          type: boolean
+          default: true
+          description: Receive in-app notifications
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+        issue_id:
+          type: string
+          nullable: true
+        comment_id:
+          type: string
+          nullable: true
+        filename:
+          type: string
+        r2_key:
+          type: string
+        size:
+          type: integer
+        mime_type:
+          type: string
+        uploader_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        downloadUrl:
+          type: string
+          format: uri
+        isImage:
+          type: boolean
+
+    SavedFilter:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        workspace_id:
+          type: string
+        name:
+          type: string
+        config:
+          type: object
+          properties:
+            status:
+              type: string
+            priority:
+              type: string
+            assignee:
+              type: string
+            search:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+          description: ID of the project this webhook belongs to
+        url:
+          type: string
+          format: uri
+          description: URL to send webhook events to
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - issue.created
+              - issue.updated
+              - issue.deleted
+              - comment.created
+              - comment.updated
+              - comment.deleted
+              - project.created
+              - project.updated
+              - project.deleted
+              - '*'
+          description: Event types this webhook subscribes to
+        secret:
+          type: string
+          nullable: true
+          description: Secret used for HMAC signature verification
+        isActive:
+          type: boolean
+          description: Whether the webhook is active
+        createdAt:
+          type: string
+          format: date-time
+
+    WebhookDelivery:
+      type: object
+      description: Record of a webhook delivery attempt
+      properties:
+        id:
+          type: string
+        eventType:
+          type: string
+          description: Type of event that triggered this delivery
+        success:
+          type: boolean
+          description: Whether the delivery was successful
+        statusCode:
+          type: integer
+          nullable: true
+          description: HTTP status code from the webhook endpoint
+        error:
+          type: string
+          nullable: true
+          description: Error message if delivery failed
+        attempt:
+          type: integer
+          description: Delivery attempt number
+        createdAt:
+          type: string
+          format: date-time
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: string
+        issue_id:
+          type: string
+        user_id:
+          type: string
+        action:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    LinkedIssue:
+      type: object
+      properties:
+        id:
+          type: string
+        issue_id:
+          type: string
+        relation:
+          type: string
+          enum: [blocks, is_blocked_by, relates_to, duplicates]
+
+    Reaction:
+      type: object
+      properties:
+        emoji:
+          type: string
+        user_ids:
+          type: array
+          items:
+            type: string
+
+    ApiResponse:
+      type: object
+      properties:
+        data:
+          type: object
+        success:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    RealtimeEvent:
+      type: object
+      description: Real-time event payload broadcast via WebSocket
+      properties:
+        type:
+          type: string
+          enum:
+            - issue.created
+            - issue.updated
+            - issue.deleted
+            - issue.status_changed
+            - issue.assigned
+            - comment.created
+            - comment.updated
+            - comment.deleted
+            - project.deleted
+            - presence.join
+            - presence.leave
+            - presence.update
+            - presence.sync
+            - pong
+          description: Type of real-time event
+        workspaceId:
+          type: string
+          description: Workspace ID the event belongs to
+        projectId:
+          type: string
+          nullable: true
+          description: Project ID (if applicable)
+        issueId:
+          type: string
+          nullable: true
+          description: Issue ID (if applicable)
+        data:
+          type: object
+          description: Event-specific payload data
+        userId:
+          type: string
+          description: User ID who triggered the event
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred
+
+    PresenceInfo:
+      type: object
+      description: Presence information for a user viewing an issue
+      properties:
+        userId:
+          type: string
+          description: User ID
+        userName:
+          type: string
+          description: User's display name
+        issueId:
+          type: string
+          description: Issue ID being viewed
+        joinedAt:
+          type: integer
+          description: Unix timestamp when user started viewing
+
+    DashboardStats:
+      type: object
+      description: Dashboard statistics for a workspace or project
+      properties:
+        totalIssues:
+          type: integer
+          description: Total number of issues
+        openIssues:
+          type: integer
+          description: Number of open issues
+        closedIssues:
+          type: integer
+          description: Number of closed issues
+        inProgressIssues:
+          type: integer
+          description: Number of issues in progress
+        overdueIssues:
+          type: integer
+          description: Number of overdue issues
+        issuesByPriority:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Issue counts grouped by priority
+        issuesByType:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Issue counts grouped by type
+        issuesBySeverity:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Issue counts grouped by severity
+        avgResolutionTime:
+          type: number
+          description: Average resolution time in hours
+        recentActivity:
+          type: integer
+          description: Number of issues updated in last 7 days
+
+    SearchResult:
+      type: object
+      description: Search result containing matched issues and pagination info
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+          description: List of matching issues
+        total:
+          type: integer
+          description: Total number of matching issues
+        hasMore:
+          type: boolean
+          description: Whether there are more results beyond the current page
+
+    SearchSuggestion:
+      type: object
+      description: Search suggestion item for autocomplete
+      properties:
+        id:
+          type: string
+          description: Issue ID
+        key:
+          type: string
+          description: Issue key (e.g., VRX-101)
+        title:
+          type: string
+          description: Issue title
+
+    ExportOptions:
+      type: object
+      description: Options for exporting issues
+      required:
+        - workspaceId
+        - format
+      properties:
+        workspaceId:
+          type: string
+          description: ID of the workspace to export issues from
+        projectId:
+          type: string
+          description: Optional project ID to filter issues
+        projectKey:
+          type: string
+          description: Optional project key for filename generation
+        format:
+          type: string
+          enum: [csv, json]
+          description: Export format
+        filters:
+          $ref: '#/components/schemas/ExportFilters'
+        fields:
+          type: array
+          items:
+            type: string
+          description: Specific fields to include in export (defaults to all standard fields)
+
+    ExportFilters:
+      type: object
+      description: Filters to apply when exporting issues
+      properties:
+        status:
+          type: array
+          items:
+            type: string
+          description: Filter by issue statuses
+        priority:
+          type: array
+          items:
+            type: string
+          description: Filter by priorities
+        type:
+          type: array
+          items:
+            type: string
+          description: Filter by issue types
+        assigneeId:
+          type: string
+          description: Filter by assignee ID
+        createdAfter:
+          type: string
+          format: date-time
+          description: Filter issues created after this date
+        createdBefore:
+          type: string
+          format: date-time
+          description: Filter issues created before this date
+
+    TrendDataPoint:
+      type: object
+      description: A single data point in issue trends
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date for this data point
+        created:
+          type: integer
+          description: Number of issues created on this date
+        resolved:
+          type: integer
+          description: Number of issues resolved on this date
+        open:
+          type: integer
+          description: Cumulative open issues on this date
+
+    BurndownDataPoint:
+      type: object
+      description: A single data point in burndown chart
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date for this data point
+        remaining:
+          type: integer
+          description: Actual remaining issues
+        ideal:
+          type: number
+          description: Ideal remaining issues for this date
+
+    PerformanceMetrics:
+      type: object
+      description: Team performance metrics
+      properties:
+        avgTimeToFirstResponse:
+          type: number
+          description: Average time to first response in hours
+        avgTimeToResolution:
+          type: number
+          description: Average time to resolution in hours
+        issuesCompletedPerWeek:
+          type: number
+          description: Average issues completed per week
+        topContributors:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+                description: User ID
+              name:
+                type: string
+                description: User name
+              issuesCompleted:
+                type: integer
+                description: Number of issues completed
+          description: Top contributors by issues completed
+
+    SLAMetrics:
+      type: object
+      description: SLA compliance metrics
+      properties:
+        totalIssues:
+          type: integer
+          description: Total resolved issues analyzed
+        withinSLA:
+          type: integer
+          description: Number of issues resolved within SLA
+        breachedSLA:
+          type: integer
+          description: Number of issues that breached SLA
+        complianceRate:
+          type: number
+          description: SLA compliance rate as percentage
+        breaches:
+          type: array
+          items:
+            $ref: '#/components/schemas/SLABreach'
+          description: List of SLA breaches
+
+    SLABreach:
+      type: object
+      description: Details of an SLA breach
+      properties:
+        issueKey:
+          type: string
+          description: Issue key (e.g., VRX-101)
+        priority:
+          type: string
+          description: Issue priority level
+        slaHours:
+          type: number
+          description: SLA target in hours for this priority
+        actualHours:
+          type: number
+          description: Actual resolution time in hours
+
+paths:
+  # Authentication
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - name
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /api/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout current user
+      description: Logs out the current user. With JWT authentication, logout is handled client-side by clearing the token.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Logged out successfully
+
+  /api/auth/magic-link:
+    post:
+      tags:
+        - Authentication
+      summary: Request a magic link for passwordless login
+      description: Sends a magic link to the provided email address for passwordless authentication. For security, the response does not reveal if the email exists.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Email address to send the magic link to
+      responses:
+        '200':
+          description: Magic link request processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Magic link sent to your email
+                  magicLink:
+                    type: string
+                    format: uri
+                    description: Only returned in development mode
+        '400':
+          description: Invalid email address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to send magic link
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/verify:
+    post:
+      tags:
+        - Authentication
+      summary: Verify magic link token
+      description: Verifies a magic link token and returns a JWT for authenticated sessions.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Magic link token received via email
+      responses:
+        '200':
+          description: Token verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                    description: JWT token for authenticated requests
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Token is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to verify token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Users
+  /api/users:
+    get:
+      tags:
+        - Users
+      summary: List all users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /api/users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current authenticated user profile
+      description: Returns the profile information of the currently authenticated user.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Users
+      summary: Update current authenticated user profile
+      description: Updates the profile information of the currently authenticated user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's display name
+                avatar_url:
+                  type: string
+                  format: uri
+                  nullable: true
+                  description: URL to user's avatar image
+                timezone:
+                  type: string
+                  description: User's timezone (e.g., UTC, America/New_York)
+      responses:
+        '200':
+          description: User profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Workspaces
+  /api/workspaces:
+    get:
+      tags:
+        - Workspaces
+      summary: List all workspaces
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of workspaces
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Workspace'
+
+    post:
+      tags:
+        - Workspaces
+      summary: Create a new workspace
+      description: Creates a new workspace. Admin role required. The creator is automatically added as an Admin member.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Workspace name
+                description:
+                  type: string
+                  description: Workspace description
+                  nullable: true
+      responses:
+        '201':
+          description: Workspace created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Workspace'
+        '400':
+          description: Invalid request - name is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}:
+    patch:
+      tags:
+        - Workspaces
+      summary: Update a workspace
+      description: Updates a workspace. Admin role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                storagePolicy:
+                  type: object
+      responses:
+        '200':
+          description: Workspace updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Workspace'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Workspaces
+      summary: Delete a workspace
+      description: Deletes a workspace and all its members. Admin role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workspace deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}/members:
+    get:
+      tags:
+        - Workspaces
+      summary: Get workspace members
+      description: Returns all members of a workspace with their roles and user information.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+      responses:
+        '200':
+          description: List of workspace members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                        workspaceId:
+                          type: string
+                        role:
+                          type: string
+                          enum: [Admin, Member, Viewer]
+                        joinedAt:
+                          type: string
+                          format: date-time
+                        user:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            email:
+                              type: string
+                              format: email
+                            avatarUrl:
+                              type: string
+                              format: uri
+                              nullable: true
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Workspaces
+      summary: Add member to workspace
+      description: Adds a user as a member to the workspace. Admin role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user to add
+                role:
+                  type: string
+                  enum: [Admin, Member, Viewer]
+                  default: Member
+                  description: Role to assign to the new member
+      responses:
+        '201':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      workspaceId:
+                        type: string
+                      userId:
+                        type: string
+                      role:
+                        type: string
+                      joinedAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request - userId required or user already a member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}/members/{userId}:
+    patch:
+      tags:
+        - Workspaces
+      summary: Update member role
+      description: Updates the role of a workspace member. Admin role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID of the member to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [Admin, Member, Viewer]
+                  description: New role for the member
+      responses:
+        '200':
+          description: Member role updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      workspaceId:
+                        type: string
+                      userId:
+                        type: string
+                      role:
+                        type: string
+        '400':
+          description: Invalid request - role is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Workspaces
+      summary: Remove member from workspace
+      description: Removes a member from the workspace. Admin role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID of the member to remove
+      responses:
+        '200':
+          description: Member removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}/stats:
+    get:
+      tags:
+        - Workspaces
+      summary: Get workspace statistics
+      description: Returns aggregated statistics for the workspace including issue counts by status and priority, plus project-level statistics.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+        - name: refresh
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Force refresh of cached statistics
+      responses:
+        '200':
+          description: Workspace statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      workspace:
+                        type: object
+                        properties:
+                          total_issues:
+                            type: integer
+                          total_projects:
+                            type: integer
+                          open_count:
+                            type: integer
+                          in_progress_count:
+                            type: integer
+                          done_count:
+                            type: integer
+                          p1_high_count:
+                            type: integer
+                          overdue_count:
+                            type: integer
+                      projects:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            project_id:
+                              type: string
+                            total_issues:
+                              type: integer
+                            open_count:
+                              type: integer
+                            in_progress_count:
+                              type: integer
+                            done_count:
+                              type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a workspace member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}/issues/all:
+    get:
+      tags:
+        - Workspaces
+      summary: Get all workspace issues
+      description: Returns all issues for a workspace in a lightweight format without related data (comments, attachments, etc.). Optimized for performance.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Workspace ID
+      responses:
+        '200':
+          description: All workspace issues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Issue'
+                      total:
+                        type: integer
+                        description: Total count of issues
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a workspace member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/workspaces/{id}/invites:
+    post:
+      tags:
+        - Workspaces
+      summary: Invite user to workspace
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [Admin, Member, Viewer]
+      responses:
+        '201':
+          description: Invitation sent
+
+  # Projects
+  /api/projects:
+    get:
+      tags:
+        - Projects
+      summary: List projects
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+
+    post:
+      tags:
+        - Projects
+      summary: Create a new project
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspace_id
+                - name
+                - key
+              properties:
+                workspace_id:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                key:
+                  type: string
+                workflow:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Project'
+
+  /api/projects/{id}:
+    patch:
+      tags:
+        - Projects
+      summary: Update a project
+      description: Updates an existing project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Project name
+                description:
+                  type: string
+                  nullable: true
+                  description: Project description
+                status:
+                  type: string
+                  enum: [Active, On Hold, Archived]
+                  description: Project status
+                workflow:
+                  type: array
+                  items:
+                    type: string
+                  description: Custom workflow stages
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Project'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Projects
+      summary: Delete a project
+      description: Deletes a project and all its related data (issues, components, members). Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: Project deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/issues:
+    get:
+      tags:
+        - Projects
+      summary: Get project issues
+      description: Returns issues for a specific project with filtering and pagination support.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: Filter by issue status
+        - name: priority
+          in: query
+          schema:
+            type: string
+          description: Filter by issue priority
+        - name: assigneeId
+          in: query
+          schema:
+            type: string
+          description: Filter by assignee ID
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in title and description
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Items per page
+      responses:
+        '200':
+          description: List of project issues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Issue'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+                      totalPages:
+                        type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a workspace member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/issues/all:
+    get:
+      tags:
+        - Projects
+      summary: Get all project issues (lightweight)
+      description: Returns all issues for a project in a lightweight format without related data (comments, attachments, etc.). Optimized for performance.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: All project issues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Issue'
+                      total:
+                        type: integer
+                        description: Total count of issues
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a project member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/stats:
+    get:
+      tags:
+        - Projects
+      summary: Get project statistics
+      description: Returns aggregated statistics for the project including issue counts by status, priority, and type.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+        - name: refresh
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Force refresh of cached statistics
+      responses:
+        '200':
+          description: Project statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_issues:
+                        type: integer
+                      open_count:
+                        type: integer
+                      in_progress_count:
+                        type: integer
+                      in_review_count:
+                        type: integer
+                      done_count:
+                        type: integer
+                      closed_count:
+                        type: integer
+                      p0_count:
+                        type: integer
+                        description: P0 - Critical priority issues
+                      p1_count:
+                        type: integer
+                        description: P1 - High priority issues
+                      p2_count:
+                        type: integer
+                        description: P2 - Medium priority issues
+                      p3_count:
+                        type: integer
+                        description: P3 - Low priority issues
+                      bug_count:
+                        type: integer
+                      feature_count:
+                        type: integer
+                      task_count:
+                        type: integer
+                      epic_count:
+                        type: integer
+                      story_count:
+                        type: integer
+                      unassigned_count:
+                        type: integer
+                      overdue_count:
+                        type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not a workspace member
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/members:
+    get:
+      tags:
+        - Projects
+      summary: Get project members
+      description: Returns all members of a project with their roles and user information.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: List of project members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        project_id:
+                          type: string
+                        user_id:
+                          type: string
+                        role:
+                          type: string
+                          enum: [Admin, Manager, Developer, Tester, Viewer]
+                        created_at:
+                          type: string
+                          format: date-time
+                        name:
+                          type: string
+                          description: User's name
+                        email:
+                          type: string
+                          format: email
+                          description: User's email
+                        avatar_url:
+                          type: string
+                          format: uri
+                          nullable: true
+                          description: User's avatar URL
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Projects
+      summary: Add member to project
+      description: Adds a user as a member to the project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - role
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user to add
+                user_id:
+                  type: string
+                  description: Alternative field name for user ID
+                role:
+                  type: string
+                  enum: [Admin, Manager, Developer, Tester, Viewer]
+                  description: Role to assign to the member
+      responses:
+        '201':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      projectId:
+                        type: string
+                      userId:
+                        type: string
+                      role:
+                        type: string
+        '400':
+          description: Invalid request - userId and role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User is already a member of this project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/members/{userId}:
+    delete:
+      tags:
+        - Projects
+      summary: Remove member from project
+      description: Removes a member from the project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID of the member to remove
+      responses:
+        '200':
+          description: Member removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      projectId:
+                        type: string
+                      userId:
+                        type: string
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Member not found in project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/projects/{id}/components:
+    get:
+      tags:
+        - Projects
+      summary: Get project components
+      description: Returns all components defined for a project.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: List of project components
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        project_id:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Issues
+  /api/issues:
+    get:
+      tags:
+        - Issues
+      summary: List issues with filters
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          schema:
+            type: string
+        - name: projectId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: assigneeId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of issues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Issue'
+                  pagination:
+                    type: object
+
+    post:
+      tags:
+        - Issues
+      summary: Create a new issue
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspace_id
+                - project_id
+                - title
+                - type
+                - priority
+                - severity
+              properties:
+                workspace_id:
+                  type: string
+                project_id:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                type:
+                  type: string
+                status:
+                  type: string
+                priority:
+                  type: string
+                severity:
+                  type: string
+                assignee_id:
+                  type: string
+                labels:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Issue created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Issue'
+
+  /api/issues/bulk:
+    patch:
+      tags:
+        - Issues
+      summary: Bulk update multiple issues
+      description: Updates multiple issues at once with the same field values. Useful for batch operations like changing status, assignee, or priority for multiple issues.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+                - updates
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of issue IDs to update
+                  minItems: 1
+                updates:
+                  type: object
+                  description: Fields to update on all specified issues
+                  properties:
+                    status:
+                      type: string
+                      description: New status for issues
+                    assigneeId:
+                      type: string
+                      nullable: true
+                      description: User ID to assign issues to (use null to unassign)
+                    assignee_id:
+                      type: string
+                      nullable: true
+                      description: Alias for assigneeId
+                    priority:
+                      type: string
+                      enum: [P0 - Critical, P1 - High, P2 - Medium, P3 - Low]
+                      description: New priority for issues
+      responses:
+        '200':
+          description: Issues updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                        description: Number of issues updated
+                      updated:
+                        type: array
+                        items:
+                          type: string
+                        description: Array of updated issue IDs
+        '400':
+          description: Invalid request - empty or invalid ids array, or no fields to update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not authorized to update one or more issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/issues/{id}:
+    get:
+      tags:
+        - Issues
+      summary: Get a single issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Issue details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Issue'
+
+    patch:
+      tags:
+        - Issues
+      summary: Update an issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Issue updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Issue'
+
+    delete:
+      tags:
+        - Issues
+      summary: Delete an issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Issue deleted
+
+  /api/issues/{id}/activity:
+    get:
+      tags:
+        - Issues
+      summary: Get issue activity log
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Issue activity log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityLog'
+
+  /api/issues/{id}/watchers:
+    get:
+      tags:
+        - Issues
+      summary: Get issue watchers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of watchers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+    post:
+      tags:
+        - Issues
+      summary: Add watcher to issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+      responses:
+        '201':
+          description: Watcher added
+
+    delete:
+      tags:
+        - Issues
+      summary: Remove watcher from issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              properties:
+                userId:
+                  type: string
+      responses:
+        '204':
+          description: Watcher removed
+
+  /api/issues/{id}/links:
+    post:
+      tags:
+        - Issues
+      summary: Link an issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetIssueId
+                - relation
+              properties:
+                targetIssueId:
+                  type: string
+                relation:
+                  type: string
+                  enum: [blocks, is_blocked_by, relates_to, duplicates]
+      responses:
+        '201':
+          description: Issue linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/LinkedIssue'
+
+  /api/issues/{id}/links/{linkId}:
+    delete:
+      tags:
+        - Issues
+      summary: Remove issue link
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: linkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Issue link removed
+
+  /api/issues/{id}/attachments:
+    get:
+      tags:
+        - Issues
+      summary: Get issue attachments
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of attachments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
+
+  /api/issues/{id}/comments:
+    get:
+      tags:
+        - Comments
+      summary: Get comments for an issue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+
+  /api/comments:
+    post:
+      tags:
+        - Comments
+      summary: Create a comment
+      description: Creates a new comment on an issue. Requires workspace membership.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - issue_id
+                - user_id
+                - content
+              properties:
+                issue_id:
+                  type: string
+                  description: ID of the issue to comment on
+                issueId:
+                  type: string
+                  description: Alternative field name for issue_id
+                user_id:
+                  type: string
+                  description: ID of the user creating the comment
+                userId:
+                  type: string
+                  description: Alternative field name for user_id
+                content:
+                  type: string
+                  description: Comment content
+                parent_id:
+                  type: string
+                  nullable: true
+                  description: ID of parent comment for threaded replies
+                parentId:
+                  type: string
+                  nullable: true
+                  description: Alternative field name for parent_id
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid request - missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not authorized to comment on this issue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Issue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/comments/{id}:
+    patch:
+      tags:
+        - Comments
+      summary: Update a comment
+      description: Updates an existing comment. Only the comment author can update their comment.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Comment ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  description: Updated comment content
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not authorized to update this comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Comments
+      summary: Delete a comment
+      description: Deletes a comment. Only the comment author or workspace admins can delete comments.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Comment ID
+      responses:
+        '204':
+          description: Comment deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not authorized to delete this comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Comment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/comments/{id}/reactions:
+    post:
+      tags:
+        - Comments
+      summary: Add reaction to comment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emoji
+              properties:
+                emoji:
+                  type: string
+      responses:
+        '201':
+          description: Reaction added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Reaction'
+
+    delete:
+      tags:
+        - Comments
+      summary: Remove reaction from comment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emoji
+              properties:
+                emoji:
+                  type: string
+      responses:
+        '204':
+          description: Reaction removed
+
+  # Components
+  /api/components:
+    post:
+      tags:
+        - Components
+      summary: Create a new component
+      description: Creates a new component for a project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - project_id
+                - name
+              properties:
+                project_id:
+                  type: string
+                  description: ID of the project this component belongs to
+                name:
+                  type: string
+                  description: Component name
+                description:
+                  type: string
+                  nullable: true
+                  description: Component description
+      responses:
+        '201':
+          description: Component created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      project_id:
+                        type: string
+                      name:
+                        type: string
+                      description:
+                        type: string
+                        nullable: true
+                      created_at:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request - project_id and name required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/components/{id}:
+    delete:
+      tags:
+        - Components
+      summary: Delete a component
+      description: Deletes a component from a project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Component ID
+      responses:
+        '200':
+          description: Component deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Component not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Custom Fields
+  /api/custom-fields:
+    get:
+      tags:
+        - Custom Fields
+      summary: List custom field definitions
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of custom fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CustomField'
+
+    post:
+      tags:
+        - Custom Fields
+      summary: Create a custom field definition
+      description: Creates a new custom field definition for a workspace. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspace_id
+                - name
+                - type
+              properties:
+                workspace_id:
+                  type: string
+                  description: ID of the workspace this custom field belongs to
+                name:
+                  type: string
+                  description: Name of the custom field
+                type:
+                  type: string
+                  enum: [text, number, select, boolean, date]
+                  description: Type of the custom field
+                options:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                  description: Options for select-type fields
+                required:
+                  type: boolean
+                  default: false
+                  description: Whether this field is required
+      responses:
+        '201':
+          description: Custom field created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CustomField'
+        '400':
+          description: Invalid request - workspace_id, name, and type are required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/custom-fields/{id}:
+    delete:
+      tags:
+        - Custom Fields
+      summary: Delete a custom field definition
+      description: Deletes a custom field definition. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Custom field ID
+      responses:
+        '200':
+          description: Custom field deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      deleted:
+                        type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Custom field not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Saved Filters
+  /api/saved-filters:
+    get:
+      tags:
+        - Saved Filters
+      summary: List saved filters
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of saved filters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SavedFilter'
+
+    post:
+      tags:
+        - Saved Filters
+      summary: Create a saved filter
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspace_id
+                - name
+                - config
+              properties:
+                workspace_id:
+                  type: string
+                name:
+                  type: string
+                config:
+                  type: object
+      responses:
+        '201':
+          description: Saved filter created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SavedFilter'
+
+  /api/saved-filters/{id}:
+    delete:
+      tags:
+        - Saved Filters
+      summary: Delete a saved filter
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Saved filter deleted
+
+  # Webhooks
+  /api/webhooks:
+    get:
+      tags:
+        - Webhooks
+      summary: List webhooks for a project
+      description: Returns all webhooks configured for a project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Project ID to list webhooks for
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Webhook'
+        '400':
+          description: projectId required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to list webhooks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Webhooks
+      summary: Create a webhook
+      description: Creates a new webhook for a project. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - projectId
+                - url
+                - events
+              properties:
+                projectId:
+                  type: string
+                  description: ID of the project to create the webhook for
+                url:
+                  type: string
+                  format: uri
+                  description: URL to send webhook events to
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - issue.created
+                      - issue.updated
+                      - issue.deleted
+                      - comment.created
+                      - comment.updated
+                      - comment.deleted
+                      - project.created
+                      - project.updated
+                      - project.deleted
+                      - '*'
+                  description: Event types to subscribe to
+                secret:
+                  type: string
+                  description: Optional secret for HMAC signature verification
+      responses:
+        '201':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Webhook'
+        '400':
+          description: Invalid request - projectId, url, and events are required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to create webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhooks/{id}:
+    get:
+      tags:
+        - Webhooks
+      summary: Get a webhook by ID
+      description: Returns a specific webhook by its ID. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Webhook ID
+      responses:
+        '200':
+          description: Webhook details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Webhook'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Webhooks
+      summary: Update a webhook
+      description: Updates an existing webhook. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Webhook ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: New URL to send webhook events to
+                events:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - issue.created
+                      - issue.updated
+                      - issue.deleted
+                      - comment.created
+                      - comment.updated
+                      - comment.deleted
+                      - project.created
+                      - project.updated
+                      - project.deleted
+                      - '*'
+                  description: New event types to subscribe to
+                secret:
+                  type: string
+                  description: New secret for HMAC signature verification
+                isActive:
+                  type: boolean
+                  description: Whether the webhook should be active
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Webhooks
+      summary: Delete a webhook
+      description: Deletes a webhook. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Webhook ID
+      responses:
+        '200':
+          description: Webhook deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to delete webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhooks/{id}/deliveries:
+    get:
+      tags:
+        - Webhooks
+      summary: Get webhook delivery history
+      description: Returns the delivery history for a specific webhook. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Webhook ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of delivery records to return
+      responses:
+        '200':
+          description: Webhook delivery history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get webhook deliveries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/webhooks/{id}/test:
+    post:
+      tags:
+        - Webhooks
+      summary: Test a webhook
+      description: Sends a test ping event to the webhook URL to verify it is configured correctly. Admin or Manager role required.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Webhook ID
+      responses:
+        '200':
+          description: Test webhook sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the test delivery was successful
+                  statusCode:
+                    type: integer
+                    description: HTTP status code from the webhook endpoint
+                  error:
+                    type: string
+                    nullable: true
+                    description: Error message if test failed
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin or Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Webhook not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to test webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Notifications - /api/notifications endpoints for managing user notifications
+  /api/notifications:
+    get:
+      tags:
+        - Notifications
+      summary: Get user notifications
+      description: Returns notifications for the currently authenticated user. Supports filtering by read status and limiting results.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of notifications to return
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: If true, return only unread notifications
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        type:
+                          type: string
+                          enum: [issue.assigned, comment.mention, issue.status_changed, comment.created]
+                        title:
+                          type: string
+                        message:
+                          type: string
+                        issueId:
+                          type: string
+                          nullable: true
+                        metadata:
+                          type: object
+                          nullable: true
+                        read:
+                          type: boolean
+                        readAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        createdAt:
+                          type: string
+                          format: date-time
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to fetch notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/unread-count:
+    get:
+      tags:
+        - Notifications
+      summary: Get unread notification count
+      description: Returns the count of unread notifications for the currently authenticated user.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Unread notification count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Number of unread notifications
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get unread count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/{id}/read:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark notification as read
+      description: Marks a specific notification as read for the currently authenticated user.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notification ID
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to mark notification as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/read-all:
+    patch:
+      tags:
+        - Notifications
+      summary: Mark all notifications as read
+      description: Marks all unread notifications as read for the currently authenticated user.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to mark all notifications as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/preferences:
+    get:
+      tags:
+        - Notifications
+      summary: Get notification preferences
+      description: Returns the notification preferences for the currently authenticated user. Returns default preferences if none have been set.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Notification preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificationPreferences'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - Notifications
+      summary: Update notification preferences
+      description: Updates the notification preferences for the currently authenticated user. Only provided fields will be updated.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emailOnAssignment:
+                  type: boolean
+                  description: Send email when assigned to an issue
+                emailOnMention:
+                  type: boolean
+                  description: Send email when mentioned in a comment
+                emailOnStatusChange:
+                  type: boolean
+                  description: Send email when a watched issue status changes
+                emailOnComment:
+                  type: boolean
+                  description: Send email when someone comments on a watched issue
+                dailyDigest:
+                  type: boolean
+                  description: Receive daily digest email
+                inAppNotifications:
+                  type: boolean
+                  description: Receive in-app notifications
+      responses:
+        '200':
+          description: Preferences updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Files
+  /api/files/upload:
+    post:
+      tags:
+        - Files
+      summary: Upload a file
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                issueId:
+                  type: string
+                commentId:
+                  type: string
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Attachment'
+
+  /api/files/{id}:
+    get:
+      tags:
+        - Files
+      summary: Get file metadata and download URL
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: File metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Attachment'
+
+    delete:
+      tags:
+        - Files
+      summary: Delete a file
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: File deleted
+
+  /api/files/download/{key}:
+    get:
+      tags:
+        - Files
+      summary: Download a file by key
+      description: Downloads a file directly using its R2 storage key. Returns the file binary data with appropriate content type headers.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The R2 storage key of the file to download
+      responses:
+        '200':
+          description: File binary data
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            image/*:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Not authorized to access this file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: File not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Admin User Management
+  # Endpoints under /api/admin require Admin role authorization
+  /api/admin/users:
+    post:
+      tags:
+        - Admin
+      summary: Create a new user (Admin only)
+      description: Creates a new user account with specified role. Only accessible by Admin users.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - name
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                name:
+                  type: string
+                  description: User's display name
+                role:
+                  type: string
+                  enum: [Admin, Manager, Developer, Tester, Viewer]
+                  description: Role to assign to the user
+                password:
+                  type: string
+                  description: Optional password for the user
+                avatarUrl:
+                  type: string
+                  format: uri
+                  description: Optional avatar URL
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      name:
+                        type: string
+                      role:
+                        type: string
+                      avatar_url:
+                        type: string
+                        format: uri
+                      created_at:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request - email, name, and role are required or invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/users/{id}:
+    patch:
+      tags:
+        - Admin
+      summary: Update a user (Admin only)
+      description: Updates user details including name, email, role, and avatar. Only accessible by Admin users.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's display name
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                role:
+                  type: string
+                  enum: [Admin, Manager, Developer, Tester, Viewer]
+                  description: User's role
+                avatarUrl:
+                  type: string
+                  format: uri
+                  nullable: true
+                  description: User's avatar URL
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      name:
+                        type: string
+                      role:
+                        type: string
+                      avatar_url:
+                        type: string
+                        format: uri
+                      created_at:
+                        type: string
+                        format: date-time
+                      updated_at:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request - no updates provided, invalid role, or cannot update deleted user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already in use by another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Admin
+      summary: Delete a user (Admin only)
+      description: Soft deletes a user. The user's issues will be unassigned. Only accessible by Admin users. Cannot delete your own account.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      deleted:
+                        type: boolean
+                      deletedAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Invalid request - cannot delete your own account or user is already deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/users/{id}/activity:
+    get:
+      tags:
+        - Admin
+      summary: Get user activity logs (Admin only)
+      description: Returns activity logs for a specific user including issue actions. Only accessible by Admin users.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of activity logs to return
+      responses:
+        '200':
+          description: User activity logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        issue_id:
+                          type: string
+                        user_id:
+                          type: string
+                        action:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                        issue_key:
+                          type: string
+                          description: Issue key (e.g., VRX-101)
+                        issue_title:
+                          type: string
+                          description: Issue title
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/stats/users:
+    get:
+      tags:
+        - Admin
+      summary: Get user statistics (Admin only)
+      description: Returns aggregate statistics about users including total count, count by role, recent signups, and deleted users. Only accessible by Admin users.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total number of active users
+                      byRole:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: Count of users by role
+                        example:
+                          Admin: 2
+                          Developer: 10
+                          Tester: 5
+                      recentSignups:
+                        type: integer
+                        description: Number of users created in the last 30 days
+                      deletedCount:
+                        type: integer
+                        description: Number of deleted users
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - Admin role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Real-time WebSocket
+  /api/realtime/ws:
+    get:
+      tags:
+        - Real-time
+      summary: WebSocket connection for real-time updates
+      description: |
+        Establishes a WebSocket connection for receiving real-time updates within a workspace.
+        This endpoint upgrades the HTTP connection to a WebSocket connection.
+
+        **Authentication:** Pass the JWT token as a query parameter (`token`).
+
+        **WebSocket Message Types (Client to Server):**
+        - `presence.join` - Join presence for an issue: `{ type: "presence.join", issueId: "...", userName: "..." }`
+        - `presence.leave` - Leave presence for an issue: `{ type: "presence.leave", issueId: "..." }`
+        - `ping` - Keep-alive ping: `{ type: "ping" }`
+
+        **WebSocket Message Types (Server to Client):**
+        - `presence.sync` - Initial presence data on connection
+        - `presence.join` - User joined issue view
+        - `presence.leave` - User left issue view
+        - `issue.created` - New issue created
+        - `issue.updated` - Issue updated
+        - `issue.deleted` - Issue deleted
+        - `issue.status_changed` - Issue status changed
+        - `issue.assigned` - Issue assigned
+        - `comment.created` - New comment added
+        - `comment.updated` - Comment updated
+        - `comment.deleted` - Comment deleted
+        - `project.deleted` - Project deleted
+        - `pong` - Response to ping
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to subscribe to updates for
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: JWT authentication token
+      responses:
+        '101':
+          description: Switching protocols - WebSocket upgrade successful
+        '400':
+          description: Missing token or workspaceId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to upgrade to WebSocket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/realtime/presence:
+    get:
+      tags:
+        - Real-time
+      summary: Get current presence information
+      description: Returns presence information for users currently viewing issues in a workspace. Optionally filter by issue ID.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to get presence for
+        - name: issueId
+          in: query
+          schema:
+            type: string
+          description: Optional issue ID to filter presence by
+      responses:
+        '200':
+          description: Current presence information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PresenceInfo'
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve presence information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/search:
+    post:
+      tags:
+        - Search
+      summary: Full-text search issues
+      description: Performs full-text search across issues using FTS5. Supports query strings, filters, sorting, and pagination.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: Full-text search query. Supports AND, OR, NOT operators and phrase search with quotes.
+                  example: "login bug"
+                filters:
+                  type: object
+                  description: Filters to apply to the search results
+                  properties:
+                    workspaceId:
+                      type: string
+                      description: Filter by workspace ID
+                    projectId:
+                      type: string
+                      description: Filter by project ID
+                    status:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by issue status
+                    priority:
+                      type: array
+                      items:
+                        type: string
+                        enum: ["P0 - Critical", "P1 - High", "P2 - Medium", "P3 - Low"]
+                      description: Filter by priority levels
+                    severity:
+                      type: array
+                      items:
+                        type: string
+                        enum: [Blocker, Major, Minor, Trivial]
+                      description: Filter by severity levels
+                    type:
+                      type: array
+                      items:
+                        type: string
+                        enum: [Bug, Task, Story, Epic, Incident, Feature, Research]
+                      description: Filter by issue types
+                    assigneeId:
+                      type: string
+                      description: Filter by assignee user ID
+                    reporterId:
+                      type: string
+                      description: Filter by reporter user ID
+                    labels:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by labels
+                    componentIds:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by component IDs
+                    createdAfter:
+                      type: string
+                      format: date-time
+                      description: Filter issues created after this date
+                    createdBefore:
+                      type: string
+                      format: date-time
+                      description: Filter issues created before this date
+                    updatedAfter:
+                      type: string
+                      format: date-time
+                      description: Filter issues updated after this date
+                    updatedBefore:
+                      type: string
+                      format: date-time
+                      description: Filter issues updated before this date
+                    dueDateAfter:
+                      type: string
+                      format: date-time
+                      description: Filter issues with due date after this date
+                    dueDateBefore:
+                      type: string
+                      format: date-time
+                      description: Filter issues with due date before this date
+                sortBy:
+                  type: string
+                  description: Field to sort by
+                  default: updated_at
+                  example: created_at
+                sortOrder:
+                  type: string
+                  enum: [ASC, DESC]
+                  default: DESC
+                  description: Sort order
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 50
+                  description: Maximum number of results to return
+                offset:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: Number of results to skip for pagination
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Issue'
+                        description: List of matching issues
+                      total:
+                        type: integer
+                        description: Total number of matching issues
+                      hasMore:
+                        type: boolean
+                        description: Whether there are more results beyond the current page
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to search issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/search/suggestions:
+    get:
+      tags:
+        - Search
+      summary: Get search suggestions
+      description: Returns search suggestions based on partial query input. Uses FTS5 prefix search to match issues.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to search within
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Partial search query (minimum 2 characters)
+          example: "log"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+          description: Maximum number of suggestions to return
+      responses:
+        '200':
+          description: Search suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          description: Issue ID
+                        key:
+                          type: string
+                          description: Issue key (e.g., VRX-101)
+                        title:
+                          type: string
+                          description: Issue title
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/search/popular-terms:
+    get:
+      tags:
+        - Search
+      summary: Get popular search terms
+      description: Returns popular search terms derived from recent issue titles in the workspace. Useful for search autocomplete.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to get popular terms for
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Maximum number of terms to return
+      responses:
+        '200':
+          description: Popular search terms
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                    description: List of popular search terms
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get popular terms
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ============================================================================
+  # ANALYTICS API
+  # ============================================================================
+
+  /api/analytics/dashboard:
+    get:
+      tags:
+        - Analytics
+      summary: Get dashboard statistics
+      description: Returns comprehensive dashboard statistics for a workspace or project including issue counts by status, priority, type, severity, and average resolution time.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to get statistics for
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional project ID to filter statistics
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      totalIssues:
+                        type: integer
+                        description: Total number of issues
+                      openIssues:
+                        type: integer
+                        description: Number of open issues
+                      closedIssues:
+                        type: integer
+                        description: Number of closed issues
+                      inProgressIssues:
+                        type: integer
+                        description: Number of issues in progress
+                      overdueIssues:
+                        type: integer
+                        description: Number of overdue issues
+                      issuesByPriority:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: Issue counts grouped by priority
+                      issuesByType:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: Issue counts grouped by type
+                      issuesBySeverity:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                        description: Issue counts grouped by severity
+                      avgResolutionTime:
+                        type: number
+                        description: Average resolution time in hours
+                      recentActivity:
+                        type: integer
+                        description: Number of issues updated in last 7 days
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/trends:
+    get:
+      tags:
+        - Analytics
+      summary: Get issue trends over time
+      description: Returns issue creation and resolution trends over a specified number of days, useful for generating trend charts.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to get trends for
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional project ID to filter trends
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+          description: Number of days to analyze
+      responses:
+        '200':
+          description: Issue trends data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          description: Date for this data point
+                        created:
+                          type: integer
+                          description: Number of issues created on this date
+                        resolved:
+                          type: integer
+                          description: Number of issues resolved on this date
+                        open:
+                          type: integer
+                          description: Cumulative open issues on this date
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get trends
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/burndown:
+    get:
+      tags:
+        - Analytics
+      summary: Get burndown chart data
+      description: Returns burndown chart data for a project over a specified date range, showing remaining issues vs ideal burndown line.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Project ID to get burndown data for
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date of the burndown period (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date of the burndown period (YYYY-MM-DD)
+      responses:
+        '200':
+          description: Burndown chart data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          description: Date for this data point
+                        remaining:
+                          type: integer
+                          description: Actual remaining issues
+                        ideal:
+                          type: number
+                          description: Ideal remaining issues for this date
+        '400':
+          description: Missing required parameters (projectId, startDate, endDate)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get burndown data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/velocity:
+    get:
+      tags:
+        - Analytics
+      summary: Get velocity metrics
+      description: Returns velocity metrics showing the number of issues completed per week over a specified number of weeks.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Project ID to get velocity data for
+        - name: weeks
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 52
+            default: 8
+          description: Number of weeks to analyze
+      responses:
+        '200':
+          description: Velocity metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        week:
+                          type: string
+                          description: Week label (e.g., "Week of 2024-01-15")
+                        completed:
+                          type: integer
+                          description: Number of issues completed this week
+                        avgStoryPoints:
+                          type: number
+                          nullable: true
+                          description: Average story points if available
+        '400':
+          description: Missing projectId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get velocity data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/cycle-time:
+    get:
+      tags:
+        - Analytics
+      summary: Get cycle time analysis
+      description: Returns cycle time analysis showing how long issues take from creation to completion, including percentiles and breakdown by issue.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Project ID to get cycle time data for
+        - name: days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+          description: Number of days to analyze
+      responses:
+        '200':
+          description: Cycle time analysis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      avgCycleTime:
+                        type: number
+                        description: Average cycle time in hours
+                      medianCycleTime:
+                        type: number
+                        description: Median cycle time in hours
+                      percentiles:
+                        type: object
+                        properties:
+                          p50:
+                            type: number
+                            description: 50th percentile cycle time in hours
+                          p75:
+                            type: number
+                            description: 75th percentile cycle time in hours
+                          p90:
+                            type: number
+                            description: 90th percentile cycle time in hours
+                          p95:
+                            type: number
+                            description: 95th percentile cycle time in hours
+                      breakdown:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            issueKey:
+                              type: string
+                              description: Issue key (e.g., VRX-101)
+                            cycleTime:
+                              type: number
+                              description: Cycle time for this issue in hours
+        '400':
+          description: Missing projectId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get cycle time data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/workload:
+    get:
+      tags:
+        - Analytics
+      summary: Get team workload distribution
+      description: Returns workload distribution across team members, showing open, in-progress, and completed issue counts per user.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workspaceId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace ID to get workload data for
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional project ID to filter workload data
+      responses:
+        '200':
+          description: Team workload distribution
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          description: User ID
+                        userName:
+                          type: string
+                          description: User display name
+                        openIssues:
+                          type: integer
+                          description: Number of open issues assigned to user
+                        inProgressIssues:
+                          type: integer
+                          description: Number of in-progress issues assigned to user
+                        completedIssues:
+                          type: integer
+                          description: Number of completed issues assigned to user
+                        totalIssues:
+                          type: integer
+                          description: Total issues assigned to user
+        '400':
+          description: Missing workspaceId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get workload data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analytics/sla:
+    get:
+      tags:
+        - Analytics
+      summary: Get SLA compliance metrics
+      description: Returns SLA compliance metrics showing how many issues were resolved within their SLA targets based on priority.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Project ID to get SLA metrics for
+      responses:
+        '200':
+          description: SLA compliance metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      totalIssues:
+                        type: integer
+                        description: Total resolved issues analyzed
+                      withinSLA:
+                        type: integer
+                        description: Number of issues resolved within SLA
+                      breachedSLA:
+                        type: integer
+                        description: Number of issues that breached SLA
+                      complianceRate:
+                        type: number
+                        description: SLA compliance rate as percentage
+                      breaches:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            issueKey:
+                              type: string
+                              description: Issue key (e.g., VRX-101)
+                            priority:
+                              type: string
+                              description: Issue priority level
+                            slaHours:
+                              type: number
+                              description: SLA target in hours for this priority
+                            actualHours:
+                              type: number
+                              description: Actual resolution time in hours
+        '400':
+          description: Missing projectId parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get SLA metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Export
+  /api/export:
+    post:
+      tags:
+        - Export
+      summary: Export issues to CSV or JSON
+      description: Exports issues from a workspace to CSV or JSON format with optional filters. Returns a downloadable file.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - workspaceId
+                - format
+              properties:
+                workspaceId:
+                  type: string
+                  description: ID of the workspace to export issues from
+                projectId:
+                  type: string
+                  description: Optional project ID to filter issues
+                projectKey:
+                  type: string
+                  description: Optional project key for filename generation
+                format:
+                  type: string
+                  enum: [csv, json]
+                  description: Export format
+                filters:
+                  type: object
+                  description: Optional filters to apply to the export
+                  properties:
+                    status:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by issue statuses
+                    priority:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by priorities
+                    type:
+                      type: array
+                      items:
+                        type: string
+                      description: Filter by issue types
+                    assigneeId:
+                      type: string
+                      description: Filter by assignee ID
+                    createdAfter:
+                      type: string
+                      format: date-time
+                      description: Filter issues created after this date
+                    createdBefore:
+                      type: string
+                      format: date-time
+                      description: Filter issues created before this date
+                fields:
+                  type: array
+                  items:
+                    type: string
+                  description: Specific fields to include in export (defaults to all standard fields)
+      responses:
+        '200':
+          description: Exported data as downloadable file
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV formatted data
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Issue'
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename for download
+        '400':
+          description: Missing required parameters or invalid format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to export data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

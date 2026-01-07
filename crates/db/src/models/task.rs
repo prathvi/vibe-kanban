@@ -22,6 +22,18 @@ pub enum TaskStatus {
     Cancelled,
 }
 
+#[derive(
+    Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS, EnumString, Display, Default,
+)]
+#[sqlx(type_name = "execution_mode", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum ExecutionMode {
+    #[default]
+    Parallel,
+    Sequential,
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
 pub struct Task {
     pub id: Uuid,
@@ -29,6 +41,8 @@ pub struct Task {
     pub title: String,
     pub description: Option<String>,
     pub status: TaskStatus,
+    pub execution_mode: ExecutionMode,
+    pub queue_position: Option<i32>,
     pub parent_workspace_id: Option<Uuid>, // Foreign key to parent Workspace
     pub shared_task_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
@@ -73,6 +87,7 @@ pub struct CreateTask {
     pub title: String,
     pub description: Option<String>,
     pub status: Option<TaskStatus>,
+    pub execution_mode: Option<ExecutionMode>,
     pub parent_workspace_id: Option<Uuid>,
     pub image_ids: Option<Vec<Uuid>>,
     pub shared_task_id: Option<Uuid>,
@@ -89,6 +104,7 @@ impl CreateTask {
             title,
             description,
             status: Some(TaskStatus::Todo),
+            execution_mode: None,
             parent_workspace_id: None,
             image_ids: None,
             shared_task_id: None,
@@ -107,6 +123,7 @@ impl CreateTask {
             title,
             description,
             status: Some(status),
+            execution_mode: None,
             parent_workspace_id: None,
             image_ids: None,
             shared_task_id: Some(shared_task_id),
@@ -119,6 +136,7 @@ pub struct UpdateTask {
     pub title: Option<String>,
     pub description: Option<String>,
     pub status: Option<TaskStatus>,
+    pub execution_mode: Option<ExecutionMode>,
     pub parent_workspace_id: Option<Uuid>,
     pub image_ids: Option<Vec<Uuid>>,
 }
@@ -147,6 +165,8 @@ impl Task {
   t.title,
   t.description,
   t.status                        AS "status!: TaskStatus",
+  t.execution_mode                AS "execution_mode!: ExecutionMode",
+  t.queue_position                AS "queue_position: i32",
   t.parent_workspace_id           AS "parent_workspace_id: Uuid",
   t.shared_task_id                AS "shared_task_id: Uuid",
   t.created_at                    AS "created_at!: DateTime<Utc>",
@@ -214,6 +234,8 @@ ORDER BY t.created_at DESC"#,
                     title: rec.title,
                     description: rec.description,
                     status: rec.status,
+                    execution_mode: rec.execution_mode,
+                    queue_position: rec.queue_position,
                     parent_workspace_id: rec.parent_workspace_id,
                     shared_task_id: rec.shared_task_id,
                     created_at: rec.created_at,
@@ -233,7 +255,7 @@ ORDER BY t.created_at DESC"#,
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE id = $1"#,
             id
@@ -245,7 +267,7 @@ ORDER BY t.created_at DESC"#,
     pub async fn find_by_rowid(pool: &SqlitePool, rowid: i64) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE rowid = $1"#,
             rowid
@@ -263,7 +285,7 @@ ORDER BY t.created_at DESC"#,
     {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE shared_task_id = $1
                LIMIT 1"#,
@@ -276,7 +298,7 @@ ORDER BY t.created_at DESC"#,
     pub async fn find_all_shared(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE shared_task_id IS NOT NULL"#
         )
@@ -290,16 +312,18 @@ ORDER BY t.created_at DESC"#,
         task_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
         let status = data.status.clone().unwrap_or_default();
+        let execution_mode = data.execution_mode.clone().unwrap_or_default();
         sqlx::query_as!(
             Task,
-            r#"INSERT INTO tasks (id, project_id, title, description, status, parent_workspace_id, shared_task_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
-               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+            r#"INSERT INTO tasks (id, project_id, title, description, status, execution_mode, parent_workspace_id, shared_task_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             task_id,
             data.project_id,
             data.title,
             data.description,
             status,
+            execution_mode,
             data.parent_workspace_id,
             data.shared_task_id
         )
@@ -321,7 +345,7 @@ ORDER BY t.created_at DESC"#,
             r#"UPDATE tasks
                SET title = $3, description = $4, status = $5, parent_workspace_id = $6
                WHERE id = $1 AND project_id = $2
-               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             project_id,
             title,
@@ -464,7 +488,7 @@ ORDER BY t.created_at DESC"#,
         // Find only child tasks that have this workspace as their parent
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE parent_workspace_id = $1
                ORDER BY created_at DESC"#,
@@ -506,5 +530,132 @@ ORDER BY t.created_at DESC"#,
             current_workspace: workspace.clone(),
             children,
         })
+    }
+
+    // ========== Sequential Queue Methods ==========
+
+    /// Find all sequential tasks for a project, ordered by queue_position
+    pub async fn find_sequential_queue_for_project(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Task,
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+               FROM tasks
+               WHERE project_id = $1 AND execution_mode = 'sequential'
+               ORDER BY queue_position ASC NULLS LAST, created_at ASC"#,
+            project_id
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    /// Get the next task in the sequential queue (first pending task)
+    pub async fn get_next_in_queue(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Task,
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", execution_mode as "execution_mode!: ExecutionMode", queue_position as "queue_position: i32", parent_workspace_id as "parent_workspace_id: Uuid", shared_task_id as "shared_task_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+               FROM tasks
+               WHERE project_id = $1
+                 AND execution_mode = 'sequential'
+                 AND status = 'todo'
+               ORDER BY queue_position ASC NULLS LAST, created_at ASC
+               LIMIT 1"#,
+            project_id
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Check if there's a sequential task currently running for the project
+    pub async fn has_running_sequential_task(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query_scalar!(
+            r#"SELECT EXISTS(
+                SELECT 1 FROM tasks t
+                WHERE t.project_id = $1
+                  AND t.execution_mode = 'sequential'
+                  AND t.status = 'inprogress'
+               ) as "exists!: bool""#,
+            project_id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(result)
+    }
+
+    /// Update the execution mode of a task
+    pub async fn update_execution_mode(
+        pool: &SqlitePool,
+        id: Uuid,
+        execution_mode: ExecutionMode,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE tasks SET execution_mode = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            execution_mode
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update the queue position of a task
+    pub async fn update_queue_position(
+        pool: &SqlitePool,
+        id: Uuid,
+        queue_position: Option<i32>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE tasks SET queue_position = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            queue_position
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Add a task to the end of the sequential queue
+    pub async fn add_to_queue(
+        pool: &SqlitePool,
+        id: Uuid,
+        project_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        // Get the max queue position for this project
+        let max_pos = sqlx::query_scalar!(
+            r#"SELECT MAX(queue_position) as "max_pos: i32" FROM tasks WHERE project_id = $1 AND execution_mode = 'sequential'"#,
+            project_id
+        )
+        .fetch_one(pool)
+        .await?;
+
+        let new_position = max_pos.unwrap_or(0) + 1;
+
+        sqlx::query!(
+            "UPDATE tasks SET execution_mode = 'sequential', queue_position = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            new_position
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Remove a task from the sequential queue (set to parallel mode)
+    pub async fn remove_from_queue(pool: &SqlitePool, id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE tasks SET execution_mode = 'parallel', queue_position = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 }

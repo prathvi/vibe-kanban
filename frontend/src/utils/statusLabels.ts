@@ -1,6 +1,10 @@
 import { TaskStatus } from 'shared/types';
 
-export const statusLabels: Record<TaskStatus, string> = {
+// Extended status type that includes the queue column
+export type KanbanColumnStatus = TaskStatus | 'queue';
+
+export const statusLabels: Record<KanbanColumnStatus, string> = {
+  queue: 'Queue',
   todo: 'To Do',
   inprogress: 'In Progress',
   inreview: 'In Review',
@@ -8,7 +12,8 @@ export const statusLabels: Record<TaskStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-export const statusBoardColors: Record<TaskStatus, string> = {
+export const statusBoardColors: Record<KanbanColumnStatus, string> = {
+  queue: '--violet',
   todo: '--neutral-foreground',
   inprogress: '--info',
   inreview: '--warning',

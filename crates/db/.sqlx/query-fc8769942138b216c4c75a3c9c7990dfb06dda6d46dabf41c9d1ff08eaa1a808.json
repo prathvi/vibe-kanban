@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", parent_workspace_id as \"parent_workspace_id: Uuid\", shared_task_id as \"shared_task_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE parent_workspace_id = $1\n               ORDER BY created_at DESC",
+  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", execution_mode as \"execution_mode!: ExecutionMode\", queue_position as \"queue_position: i32\", parent_workspace_id as \"parent_workspace_id: Uuid\", shared_task_id as \"shared_task_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE shared_task_id IS NOT NULL",
   "describe": {
     "columns": [
       {
@@ -29,28 +29,38 @@
         "type_info": "Text"
       },
       {
-        "name": "parent_workspace_id: Uuid",
+        "name": "execution_mode!: ExecutionMode",
         "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "queue_position: i32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "parent_workspace_id: Uuid",
+        "ordinal": 7,
         "type_info": "Blob"
       },
       {
         "name": "shared_task_id: Uuid",
-        "ordinal": 6,
+        "ordinal": 8,
         "type_info": "Blob"
       },
       {
         "name": "created_at!: DateTime<Utc>",
-        "ordinal": 7,
+        "ordinal": 9,
         "type_info": "Text"
       },
       {
         "name": "updated_at!: DateTime<Utc>",
-        "ordinal": 8,
+        "ordinal": 10,
         "type_info": "Text"
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 0
     },
     "nullable": [
       true,
@@ -58,11 +68,13 @@
       false,
       true,
       false,
+      false,
+      true,
       true,
       true,
       false,
       false
     ]
   },
-  "hash": "8540534cf071da7c5027111bc8464ff2044e3e1a2a50ff9eb8cfccdec2292ad2"
+  "hash": "fc8769942138b216c4c75a3c9c7990dfb06dda6d46dabf41c9d1ff08eaa1a808"
 }

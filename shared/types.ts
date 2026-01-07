@@ -12,11 +12,11 @@ export type SharedTask = { id: string, organization_id: string, project_id: stri
 
 export type UserData = { user_id: string, first_name: string | null, last_name: string | null, username: string | null, };
 
-export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, github_repo_url: string | null, github_sync_enabled: boolean, github_sync_labels: string | null, github_last_sync_at: string | null, gitlab_project_url: string | null, gitlab_sync_enabled: boolean, gitlab_sync_labels: string | null, gitlab_last_sync_at: string | null, created_at: Date, updated_at: Date, };
+export type Project = { id: string, name: string, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, remote_project_id: string | null, github_repo_url: string | null, github_sync_enabled: boolean, github_sync_labels: string | null, github_last_sync_at: string | null, gitlab_project_url: string | null, gitlab_sync_enabled: boolean, gitlab_sync_labels: string | null, gitlab_last_sync_at: string | null, vortex_api_url: string | null, vortex_project_id: string | null, vortex_sync_enabled: boolean, vortex_sync_labels: string | null, vortex_last_sync_at: string | null, created_at: Date, updated_at: Date, };
 
 export type CreateProject = { name: string, repositories: Array<CreateProjectRepo>, };
 
-export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, github_repo_url: string | null, github_token: string | null, github_sync_enabled: boolean | null, github_sync_labels: string | null, gitlab_project_url: string | null, gitlab_token: string | null, gitlab_sync_enabled: boolean | null, gitlab_sync_labels: string | null, };
+export type UpdateProject = { name: string | null, dev_script: string | null, dev_script_working_dir: string | null, default_agent_working_dir: string | null, github_repo_url: string | null, github_token: string | null, github_sync_enabled: boolean | null, github_sync_labels: string | null, gitlab_project_url: string | null, gitlab_token: string | null, gitlab_sync_enabled: boolean | null, gitlab_sync_labels: string | null, vortex_api_url: string | null, vortex_project_id: string | null, vortex_token: string | null, vortex_sync_enabled: boolean | null, vortex_sync_labels: string | null, };
 
 export type SearchResult = { path: string, is_file: boolean, match_type: SearchMatchType, };
 
@@ -44,15 +44,17 @@ export type UpdateTag = { tag_name: string | null, content: string | null, };
 
 export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelled";
 
-export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type ExecutionMode = "parallel" | "sequential";
 
-export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, latest_workspace_id: string | null, latest_workspace_container_ref: string | null, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, execution_mode: ExecutionMode, queue_position: number | null, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+
+export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, latest_workspace_id: string | null, latest_workspace_container_ref: string | null, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, execution_mode: ExecutionMode, queue_position: number | null, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
 
 export type TaskRelationships = { parent_task: Task | null, current_workspace: Workspace, children: Array<Task>, };
 
-export type CreateTask = { project_id: string, title: string, description: string | null, status: TaskStatus | null, parent_workspace_id: string | null, image_ids: Array<string> | null, shared_task_id: string | null, };
+export type CreateTask = { project_id: string, title: string, description: string | null, status: TaskStatus | null, execution_mode: ExecutionMode | null, parent_workspace_id: string | null, image_ids: Array<string> | null, shared_task_id: string | null, };
 
-export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, parent_workspace_id: string | null, image_ids: Array<string> | null, };
+export type UpdateTask = { title: string | null, description: string | null, status: TaskStatus | null, execution_mode: ExecutionMode | null, parent_workspace_id: string | null, image_ids: Array<string> | null, };
 
 export type DraftFollowUpData = { message: string, variant: string | null, };
 
@@ -343,6 +345,24 @@ export type ImportGitLabIssueRequest = { issue_iid: bigint, auto_start: boolean 
 export type ImportGitLabIssueResponse = { task: Task, issue: GitLabIssue, };
 
 export type GitLabConfigStatus = { has_project_url: boolean, has_token: boolean, project_url: string | null, sync_enabled: boolean, sync_labels: string | null, };
+
+export type VortexIssue = { id: string, key: string, title: string, description: string | null, type: string | null, status: string, priority: string | null, severity: string | null, assignee_id: string | null, reporter_id: string | null, labels: Array<string>, attachments: Array<VortexAttachment>, created_at: string, updated_at: string, };
+
+export type VortexUser = { id: string, name: string, email: string, avatar_url: string | null, };
+
+export type VortexAttachment = { id: string, filename: string, downloadUrl: string | null, mimeType: string | null, isImage: boolean, };
+
+export type VortexComment = { id: string, issue_id: string, user_id: string, content: string, created_at: string, };
+
+export type ListVortexIssuesParams = { status: string | null, priority: string | null, labels: string | null, page: number | null, limit: number | null, };
+
+export type VortexIssuesResponse = { issues: Array<VortexIssue>, has_vortex_config: boolean, };
+
+export type ImportVortexIssueRequest = { issue_id: string, };
+
+export type ImportVortexIssueResponse = { task: Task, issue: VortexIssue, };
+
+export type VortexConfigStatus = { has_project_id: boolean, has_token: boolean, project_id: string | null, sync_enabled: boolean, sync_labels: string | null, };
 
 export type RepoBranchStatus = { repo_id: string, repo_name: string, commits_behind: number | null, commits_ahead: number | null, has_uncommitted_changes: boolean | null, head_oid: string | null, uncommitted_count: number | null, untracked_count: number | null, target_branch_name: string, remote_commits_behind: number | null, remote_commits_ahead: number | null, merges: Array<Merge>, 
 /**

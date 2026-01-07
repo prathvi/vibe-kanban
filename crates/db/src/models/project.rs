@@ -41,6 +41,15 @@ pub struct Project {
     pub gitlab_sync_labels: Option<String>,
     #[ts(type = "string | null")]
     pub gitlab_last_sync_at: Option<DateTime<Utc>>,
+    pub vortex_api_url: Option<String>,
+    pub vortex_project_id: Option<String>,
+    #[serde(skip_serializing)]
+    #[ts(skip)]
+    pub vortex_token: Option<String>,
+    pub vortex_sync_enabled: bool,
+    pub vortex_sync_labels: Option<String>,
+    #[ts(type = "string | null")]
+    pub vortex_last_sync_at: Option<DateTime<Utc>>,
     #[ts(type = "Date")]
     pub created_at: DateTime<Utc>,
     #[ts(type = "Date")]
@@ -67,6 +76,11 @@ pub struct UpdateProject {
     pub gitlab_token: Option<String>,
     pub gitlab_sync_enabled: Option<bool>,
     pub gitlab_sync_labels: Option<String>,
+    pub vortex_api_url: Option<String>,
+    pub vortex_project_id: Option<String>,
+    pub vortex_token: Option<String>,
+    pub vortex_sync_enabled: Option<bool>,
+    pub vortex_sync_labels: Option<String>,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -109,6 +123,12 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -135,6 +155,12 @@ impl Project {
                    p.gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                    p.gitlab_sync_labels,
                    p.gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                   p.vortex_api_url,
+                   p.vortex_project_id,
+                   p.vortex_token,
+                   p.vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                   p.vortex_sync_labels,
+                   p.vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                    p.created_at as "created_at!: DateTime<Utc>", p.updated_at as "updated_at!: DateTime<Utc>"
             FROM projects p
             WHERE p.id IN (
@@ -170,6 +196,12 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -199,6 +231,12 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -231,6 +269,12 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -271,6 +315,12 @@ impl Project {
                           gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                           gitlab_sync_labels,
                           gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                          vortex_api_url,
+                          vortex_project_id,
+                          vortex_token,
+                          vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                          vortex_sync_labels,
+                          vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                           created_at as "created_at!: DateTime<Utc>",
                           updated_at as "updated_at!: DateTime<Utc>""#,
             project_id,
@@ -293,33 +343,73 @@ impl Project {
         let dev_script = payload.dev_script.clone();
         let dev_script_working_dir = payload.dev_script_working_dir.clone();
         let default_agent_working_dir = payload.default_agent_working_dir.clone();
-        let github_repo_url = payload.github_repo_url.clone()
+        let github_repo_url = payload
+            .github_repo_url
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.github_repo_url);
-        let github_token = payload.github_token.clone()
+        let github_token = payload
+            .github_token
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.github_token);
-        let github_sync_enabled = payload.github_sync_enabled.unwrap_or(existing.github_sync_enabled);
-        let github_sync_labels = payload.github_sync_labels.clone()
+        let github_sync_enabled = payload
+            .github_sync_enabled
+            .unwrap_or(existing.github_sync_enabled);
+        let github_sync_labels = payload
+            .github_sync_labels
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.github_sync_labels);
-        let gitlab_project_url = payload.gitlab_project_url.clone()
+        let gitlab_project_url = payload
+            .gitlab_project_url
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.gitlab_project_url);
-        let gitlab_token = payload.gitlab_token.clone()
+        let gitlab_token = payload
+            .gitlab_token
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.gitlab_token);
-        let gitlab_sync_enabled = payload.gitlab_sync_enabled.unwrap_or(existing.gitlab_sync_enabled);
-        let gitlab_sync_labels = payload.gitlab_sync_labels.clone()
+        let gitlab_sync_enabled = payload
+            .gitlab_sync_enabled
+            .unwrap_or(existing.gitlab_sync_enabled);
+        let gitlab_sync_labels = payload
+            .gitlab_sync_labels
+            .clone()
             .filter(|s| !s.is_empty())
             .or(existing.gitlab_sync_labels);
+        let vortex_api_url = payload
+            .vortex_api_url
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.vortex_api_url);
+        let vortex_project_id = payload
+            .vortex_project_id
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.vortex_project_id);
+        let vortex_token = payload
+            .vortex_token
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.vortex_token);
+        let vortex_sync_enabled = payload
+            .vortex_sync_enabled
+            .unwrap_or(existing.vortex_sync_enabled);
+        let vortex_sync_labels = payload
+            .vortex_sync_labels
+            .clone()
+            .filter(|s| !s.is_empty())
+            .or(existing.vortex_sync_labels);
 
         sqlx::query_as!(
             Project,
             r#"UPDATE projects
                SET name = $2, dev_script = $3, dev_script_working_dir = $4, default_agent_working_dir = $5,
                    github_repo_url = $6, github_token = $7, github_sync_enabled = $8, github_sync_labels = $9,
-                   gitlab_project_url = $10, gitlab_token = $11, gitlab_sync_enabled = $12, gitlab_sync_labels = $13
+                   gitlab_project_url = $10, gitlab_token = $11, gitlab_sync_enabled = $12, gitlab_sync_labels = $13,
+                   vortex_api_url = $14, vortex_project_id = $15, vortex_token = $16, vortex_sync_enabled = $17, vortex_sync_labels = $18
                WHERE id = $1
                RETURNING id as "id!: Uuid",
                          name,
@@ -337,6 +427,12 @@ impl Project {
                          gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                          gitlab_sync_labels,
                          gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                         vortex_api_url,
+                         vortex_project_id,
+                         vortex_token,
+                         vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                         vortex_sync_labels,
+                         vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                          created_at as "created_at!: DateTime<Utc>",
                          updated_at as "updated_at!: DateTime<Utc>""#,
             id,
@@ -352,6 +448,11 @@ impl Project {
             gitlab_token,
             gitlab_sync_enabled,
             gitlab_sync_labels,
+            vortex_api_url,
+            vortex_project_id,
+            vortex_token,
+            vortex_sync_enabled,
+            vortex_sync_labels,
         )
         .fetch_one(pool)
         .await
@@ -390,7 +491,6 @@ impl Project {
         Ok(())
     }
 
-    /// Transaction-compatible version of set_remote_project_id
     pub async fn set_remote_project_id_tx<'e, E>(
         executor: E,
         id: Uuid,
@@ -419,10 +519,7 @@ impl Project {
         Ok(result.rows_affected())
     }
 
-    pub async fn update_github_last_sync(
-        pool: &SqlitePool,
-        id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn update_github_last_sync(pool: &SqlitePool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"UPDATE projects
                SET github_last_sync_at = datetime('now')
@@ -434,7 +531,9 @@ impl Project {
         Ok(())
     }
 
-    pub async fn find_with_github_sync_enabled(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_with_github_sync_enabled(
+        pool: &SqlitePool,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
             r#"SELECT id as "id!: Uuid",
@@ -453,6 +552,12 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
@@ -464,10 +569,7 @@ impl Project {
         .await
     }
 
-    pub async fn update_gitlab_last_sync(
-        pool: &SqlitePool,
-        id: Uuid,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn update_gitlab_last_sync(pool: &SqlitePool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"UPDATE projects
                SET gitlab_last_sync_at = datetime('now')
@@ -479,7 +581,9 @@ impl Project {
         Ok(())
     }
 
-    pub async fn find_with_gitlab_sync_enabled(pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
+    pub async fn find_with_gitlab_sync_enabled(
+        pool: &SqlitePool,
+    ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as!(
             Project,
             r#"SELECT id as "id!: Uuid",
@@ -498,12 +602,68 @@ impl Project {
                       gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
                       gitlab_sync_labels,
                       gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
                       created_at as "created_at!: DateTime<Utc>",
                       updated_at as "updated_at!: DateTime<Utc>"
                FROM projects
                WHERE gitlab_sync_enabled = 1
                  AND gitlab_project_url IS NOT NULL
                  AND gitlab_token IS NOT NULL"#
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    pub async fn update_vortex_last_sync(pool: &SqlitePool, id: Uuid) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE projects
+               SET vortex_last_sync_at = datetime('now')
+               WHERE id = $1"#,
+            id
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn find_with_vortex_sync_enabled(
+        pool: &SqlitePool,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Project,
+            r#"SELECT id as "id!: Uuid",
+                      name,
+                      dev_script,
+                      dev_script_working_dir,
+                      default_agent_working_dir,
+                      remote_project_id as "remote_project_id: Uuid",
+                      github_repo_url,
+                      github_token,
+                      github_sync_enabled as "github_sync_enabled!: bool",
+                      github_sync_labels,
+                      github_last_sync_at as "github_last_sync_at: DateTime<Utc>",
+                      gitlab_project_url,
+                      gitlab_token,
+                      gitlab_sync_enabled as "gitlab_sync_enabled!: bool",
+                      gitlab_sync_labels,
+                      gitlab_last_sync_at as "gitlab_last_sync_at: DateTime<Utc>",
+                      vortex_api_url,
+                      vortex_project_id,
+                      vortex_token,
+                      vortex_sync_enabled as "vortex_sync_enabled!: bool",
+                      vortex_sync_labels,
+                      vortex_last_sync_at as "vortex_last_sync_at: DateTime<Utc>",
+                      created_at as "created_at!: DateTime<Utc>",
+                      updated_at as "updated_at!: DateTime<Utc>"
+               FROM projects
+               WHERE vortex_sync_enabled = 1
+                 AND vortex_project_id IS NOT NULL
+                 AND vortex_token IS NOT NULL"#
         )
         .fetch_all(pool)
         .await

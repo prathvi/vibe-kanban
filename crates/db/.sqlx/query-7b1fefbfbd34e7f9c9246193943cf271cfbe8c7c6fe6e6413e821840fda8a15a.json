@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n                SELECT 1 FROM tasks t\n                WHERE t.project_id = $1\n                  AND t.execution_mode = 'sequential'\n                  AND t.status = 'inprogress'\n               ) as \"exists!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "exists!: bool",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7b1fefbfbd34e7f9c9246193943cf271cfbe8c7c6fe6e6413e821840fda8a15a"
+}

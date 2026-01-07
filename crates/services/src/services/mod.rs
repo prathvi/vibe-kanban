@@ -21,6 +21,8 @@ pub mod project;
 pub mod queued_message;
 pub mod remote_client;
 pub mod repo;
+pub mod sequential_queue;
 pub mod share;
+pub mod vortex_issues;
 pub mod workspace_manager;
 pub mod worktree_manager;

@@ -157,6 +157,40 @@ export interface ImportGitLabIssueResponse {
   issue: GitLabIssue;
 }
 
+export interface VortexConfigStatus {
+  has_project_id: boolean;
+  has_token: boolean;
+  project_id: string | null;
+  sync_enabled: boolean;
+  sync_labels: string | null;
+}
+
+export interface VortexIssue {
+  id: string;
+  key: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string | null;
+  issue_type: string | null;
+  severity: string | null;
+  assignee_id: string | null;
+  reporter_id: string | null;
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VortexIssuesResponse {
+  issues: VortexIssue[];
+  has_vortex_config: boolean;
+}
+
+export interface ImportVortexIssueResponse {
+  task: Task;
+  issue: VortexIssue;
+}
+
 export class ApiError<E = unknown> extends Error {
   public status?: number;
   public error_data?: E;
@@ -559,6 +593,54 @@ export const projectsApi = {
     );
     return handleApiResponse<ImportGitLabIssueResponse[]>(response);
   },
+
+  // Vortex Integration
+  getVortexConfig: async (projectId: string): Promise<VortexConfigStatus> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/vortex/config`
+    );
+    return handleApiResponse<VortexConfigStatus>(response);
+  },
+
+  listVortexIssues: async (
+    projectId: string,
+    params?: { status?: string; labels?: string; page?: number; per_page?: number }
+  ): Promise<VortexIssuesResponse> => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.append('status', params.status);
+    if (params?.labels) searchParams.append('labels', params.labels);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.per_page) searchParams.append('per_page', params.per_page.toString());
+    const query = searchParams.toString();
+    const response = await makeRequest(
+      `/api/projects/${projectId}/vortex/issues${query ? `?${query}` : ''}`
+    );
+    return handleApiResponse<VortexIssuesResponse>(response);
+  },
+
+  importVortexIssue: async (
+    projectId: string,
+    issueId: string
+  ): Promise<ImportVortexIssueResponse> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/vortex/issues/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ issue_id: issueId }),
+      }
+    );
+    return handleApiResponse<ImportVortexIssueResponse>(response);
+  },
+
+  syncVortexIssues: async (projectId: string): Promise<ImportVortexIssueResponse[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/vortex/issues/sync`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<ImportVortexIssueResponse[]>(response);
+  },
 };
 
 // Task Management APIs
@@ -640,6 +722,14 @@ export const tasksApi = {
       body: JSON.stringify(data),
     });
     return handleApiResponse<Task | null>(response);
+  },
+
+  reorderQueue: async (taskId: string, newPosition: number): Promise<Task> => {
+    const response = await makeRequest(`/api/tasks/${taskId}/reorder-queue`, {
+      method: 'POST',
+      body: JSON.stringify({ new_position: newPosition }),
+    });
+    return handleApiResponse<Task>(response);
   },
 };
 

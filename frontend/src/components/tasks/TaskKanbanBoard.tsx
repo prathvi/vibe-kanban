@@ -8,8 +8,12 @@ import {
   KanbanProvider,
 } from '@/components/ui/shadcn-io/kanban';
 import { TaskCard } from './TaskCard';
-import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types';
-import { statusBoardColors, statusLabels } from '@/utils/statusLabels';
+import type { TaskWithAttemptStatus } from 'shared/types';
+import {
+  statusBoardColors,
+  statusLabels,
+  type KanbanColumnStatus,
+} from '@/utils/statusLabels';
 import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
 import { SharedTaskCard } from './SharedTaskCard';
 
@@ -24,7 +28,7 @@ export type KanbanColumnItem =
       task: SharedTaskRecord;
     };
 
-export type KanbanColumns = Record<TaskStatus, KanbanColumnItem[]>;
+export type KanbanColumns = Record<KanbanColumnStatus, KanbanColumnItem[]>;
 
 interface TaskKanbanBoardProps {
   columns: KanbanColumns;
@@ -52,13 +56,15 @@ function TaskKanbanBoard({
   return (
     <KanbanProvider onDragEnd={onDragEnd}>
       {Object.entries(columns).map(([status, items]) => {
-        const statusKey = status as TaskStatus;
+        const statusKey = status as KanbanColumnStatus;
+        // Queue column is not droppable (tasks have fixed position based on queue_position)
+        const isQueueColumn = statusKey === 'queue';
         return (
           <KanbanBoard key={status} id={statusKey}>
             <KanbanHeader
               name={statusLabels[statusKey]}
               color={statusBoardColors[statusKey]}
-              onAddTask={onCreateTask}
+              onAddTask={isQueueColumn ? undefined : onCreateTask}
             />
             <KanbanCards>
               {items.map((item, index) => {
@@ -79,6 +85,7 @@ function TaskKanbanBoard({
                       isOpen={selectedTaskId === item.task.id}
                       projectId={projectId}
                       sharedTask={item.sharedTask}
+                      showQueuePosition={isQueueColumn}
                     />
                   );
                 }

@@ -140,6 +140,11 @@ impl ProjectService {
                     gitlab_token: None,
                     gitlab_sync_enabled: None,
                     gitlab_sync_labels: None,
+                    vortex_api_url: None,
+                    vortex_project_id: None,
+                    vortex_token: None,
+                    vortex_sync_enabled: None,
+                    vortex_sync_labels: None,
                 },
             )
             .await?;

@@ -17,12 +17,12 @@ use db::models::{
     project::{Project, ProjectError},
     project_repo::ProjectRepo,
     repo::Repo,
-    task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
+    task::{CreateTask, ExecutionMode, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
     workspace::{CreateWorkspace, Workspace},
     workspace_repo::{CreateWorkspaceRepo, WorkspaceRepo},
 };
-use executors::profile::ExecutorConfigs;
 use deployment::Deployment;
+use executors::profile::ExecutorConfigs;
 use executors::profile::ExecutorProfileId;
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,9 @@ use uuid::Uuid;
 use crate::{
     DeploymentImpl, error::ApiError, middleware::load_task_middleware,
     routes::task_attempts::WorkspaceRepoInput,
+};
+use services::services::vortex_issues::{
+    VortexIssuesService, extract_vortex_issue_id_from_description, is_vortex_imported_task,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -265,14 +268,21 @@ pub async fn update_task(
         Some(s) => Some(s),                     // Non-empty string = update description
         None => existing_task.description.clone(), // Field omitted = keep existing
     };
-    let status = payload.status.clone().unwrap_or(existing_task.status.clone());
+    let status = payload
+        .status
+        .clone()
+        .unwrap_or(existing_task.status.clone());
     let parent_workspace_id = payload
         .parent_workspace_id
         .or(existing_task.parent_workspace_id);
 
     // Check if status is changing TO InProgress (for auto-start)
-    let status_changing_to_in_progress = existing_task.status != TaskStatus::InProgress
-        && status == TaskStatus::InProgress;
+    let status_changing_to_in_progress =
+        existing_task.status != TaskStatus::InProgress && status == TaskStatus::InProgress;
+
+    // Check if status is changing TO InReview (for Vortex sync)
+    let status_changing_to_in_review =
+        existing_task.status != TaskStatus::InReview && status == TaskStatus::InReview;
 
     let task = Task::update(
         &deployment.db().pool,
@@ -284,6 +294,25 @@ pub async fn update_task(
         parent_workspace_id,
     )
     .await?;
+
+    // Handle execution mode changes
+    if let Some(new_execution_mode) = payload.execution_mode {
+        let pool = &deployment.db().pool;
+        match (&existing_task.execution_mode, &new_execution_mode) {
+            (ExecutionMode::Parallel, ExecutionMode::Sequential) => {
+                // Moving from parallel to sequential - add to queue
+                Task::add_to_queue(pool, task.id, task.project_id).await?;
+            }
+            (ExecutionMode::Sequential, ExecutionMode::Parallel) => {
+                // Moving from sequential to parallel - remove from queue
+                Task::remove_from_queue(pool, task.id).await?;
+            }
+            _ => {
+                // Same mode, just update
+                Task::update_execution_mode(pool, task.id, new_execution_mode).await?;
+            }
+        }
+    }
 
     if let Some(image_ids) = &payload.image_ids {
         TaskImage::delete_by_task_id(&deployment.db().pool, task.id).await?;
@@ -306,6 +335,17 @@ pub async fn update_task(
             }
         }
     }
+
+    if status_changing_to_in_review {
+        if let Err(e) = sync_vortex_task_status(&deployment, &task).await {
+            tracing::warn!("Failed to sync Vortex status for task {}: {}", task.id, e);
+        }
+    }
+
+    // Re-fetch the task to get updated execution_mode and queue_position
+    let task = Task::find_by_id(&deployment.db().pool, task.id)
+        .await?
+        .ok_or(ApiError::Database(SqlxError::RowNotFound))?;
 
     // If task has been shared, broadcast update
     if task.shared_task_id.is_some() {
@@ -404,6 +444,67 @@ async fn auto_start_task(deployment: &DeploymentImpl, task: &Task) -> Result<(),
         .await;
 
     tracing::info!("Auto-started attempt for task {}", task.id);
+    Ok(())
+}
+
+async fn sync_vortex_task_status(deployment: &DeploymentImpl, task: &Task) -> Result<(), ApiError> {
+    let description = match &task.description {
+        Some(d) => d,
+        None => return Ok(()),
+    };
+
+    if !is_vortex_imported_task(description) {
+        return Ok(());
+    }
+
+    let vortex_issue_id = match extract_vortex_issue_id_from_description(description) {
+        Some(id) => id,
+        None => {
+            tracing::debug!("Could not extract Vortex issue ID from task {}", task.id);
+            return Ok(());
+        }
+    };
+
+    let project = Project::find_by_id(&deployment.db().pool, task.project_id)
+        .await?
+        .ok_or(ProjectError::ProjectNotFound)?;
+
+    let token = match &project.vortex_token {
+        Some(t) => t.clone(),
+        None => return Ok(()),
+    };
+
+    let service = VortexIssuesService::new();
+
+    if let Err(e) = service
+        .update_issue_status(&token, &vortex_issue_id, "In Review")
+        .await
+    {
+        tracing::warn!("Failed to update Vortex issue status: {}", e);
+    }
+
+    let comment_content = format!(
+        "Task moved to review in Vibe-Kanban.\n\nTask: {}",
+        task.title
+    );
+    if let Err(e) = service
+        .add_comment_as_current_user(&token, &vortex_issue_id, &comment_content)
+        .await
+    {
+        tracing::warn!("Failed to add Vortex comment: {}", e);
+    }
+
+    deployment
+        .track_if_analytics_allowed(
+            "vortex_status_synced",
+            serde_json::json!({
+                "task_id": task.id.to_string(),
+                "vortex_issue_id": vortex_issue_id,
+                "new_status": "In Review",
+            }),
+        )
+        .await;
+
     Ok(())
 }
 
@@ -580,11 +681,53 @@ pub async fn share_task(
     })))
 }
 
+#[derive(Debug, Serialize, Deserialize, TS)]
+pub struct ReorderQueueRequest {
+    pub new_position: i32,
+}
+
+/// Reorder a task within the sequential queue
+pub async fn reorder_queue(
+    Extension(task): Extension<Task>,
+    State(deployment): State<DeploymentImpl>,
+    Json(payload): Json<ReorderQueueRequest>,
+) -> Result<ResponseJson<ApiResponse<Task>>, ApiError> {
+    // Verify task is in sequential mode
+    if task.execution_mode != ExecutionMode::Sequential {
+        return Err(ApiError::BadRequest(
+            "Task is not in sequential mode".to_string(),
+        ));
+    }
+
+    // Update the queue position
+    Task::update_queue_position(&deployment.db().pool, task.id, Some(payload.new_position)).await?;
+
+    // Fetch and return the updated task
+    let updated_task = Task::find_by_id(&deployment.db().pool, task.id)
+        .await?
+        .ok_or(ApiError::BadRequest(
+            "Task not found after update".to_string(),
+        ))?;
+
+    Ok(ResponseJson(ApiResponse::success(updated_task)))
+}
+
+/// Get the sequential queue for a project
+pub async fn get_sequential_queue(
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<TaskQuery>,
+) -> Result<ResponseJson<ApiResponse<Vec<Task>>>, ApiError> {
+    let tasks =
+        Task::find_sequential_queue_for_project(&deployment.db().pool, query.project_id).await?;
+    Ok(ResponseJson(ApiResponse::success(tasks)))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_actions_router = Router::new()
         .route("/", put(update_task))
         .route("/", delete(delete_task))
-        .route("/share", post(share_task));
+        .route("/share", post(share_task))
+        .route("/reorder-queue", post(reorder_queue));
 
     let task_id_router = Router::new()
         .route("/", get(get_task))
@@ -595,6 +738,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/", get(get_tasks).post(create_task))
         .route("/stream/ws", get(stream_tasks_ws))
         .route("/create-and-start", post(create_task_and_start))
+        .route("/queue", get(get_sequential_queue))
         .nest("/{task_id}", task_id_router);
 
     // mount under /projects/:project_id/tasks

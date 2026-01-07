@@ -1,0 +1,158 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT p.id as \"id!: Uuid\", p.name, p.dev_script, p.dev_script_working_dir,\n                   p.default_agent_working_dir,\n                   p.remote_project_id as \"remote_project_id: Uuid\",\n                   p.github_repo_url,\n                   p.github_token,\n                   p.github_sync_enabled as \"github_sync_enabled!: bool\",\n                   p.github_sync_labels,\n                   p.github_last_sync_at as \"github_last_sync_at: DateTime<Utc>\",\n                   p.gitlab_project_url,\n                   p.gitlab_token,\n                   p.gitlab_sync_enabled as \"gitlab_sync_enabled!: bool\",\n                   p.gitlab_sync_labels,\n                   p.gitlab_last_sync_at as \"gitlab_last_sync_at: DateTime<Utc>\",\n                   p.vortex_api_url,\n                   p.vortex_project_id,\n                   p.vortex_token,\n                   p.vortex_sync_enabled as \"vortex_sync_enabled!: bool\",\n                   p.vortex_sync_labels,\n                   p.vortex_last_sync_at as \"vortex_last_sync_at: DateTime<Utc>\",\n                   p.created_at as \"created_at!: DateTime<Utc>\", p.updated_at as \"updated_at!: DateTime<Utc>\"\n            FROM projects p\n            WHERE p.id IN (\n                SELECT DISTINCT t.project_id\n                FROM tasks t\n                INNER JOIN workspaces w ON w.task_id = t.id\n                ORDER BY w.updated_at DESC\n            )\n            LIMIT $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "dev_script",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "dev_script_working_dir",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "default_agent_working_dir",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "remote_project_id: Uuid",
+        "ordinal": 5,
+        "type_info": "Blob"
+      },
+      {
+        "name": "github_repo_url",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "github_token",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "github_sync_enabled!: bool",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "github_sync_labels",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "github_last_sync_at: DateTime<Utc>",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "gitlab_project_url",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "gitlab_token",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "gitlab_sync_enabled!: bool",
+        "ordinal": 13,
+        "type_info": "Integer"
+      },
+      {
+        "name": "gitlab_sync_labels",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "gitlab_last_sync_at: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "vortex_api_url",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "vortex_project_id",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "vortex_token",
+        "ordinal": 18,
+        "type_info": "Text"
+      },
+      {
+        "name": "vortex_sync_enabled!: bool",
+        "ordinal": 19,
+        "type_info": "Integer"
+      },
+      {
+        "name": "vortex_sync_labels",
+        "ordinal": 20,
+        "type_info": "Text"
+      },
+      {
+        "name": "vortex_last_sync_at: DateTime<Utc>",
+        "ordinal": 21,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 22,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 23,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e2904d69ddfa02d1f5728ede6dfcd51367b4878942240f1d98f3d067ee112bee"
+}

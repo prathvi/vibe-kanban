@@ -754,6 +754,7 @@ impl TaskServer {
             title,
             description: expanded_description,
             status,
+            execution_mode: None,
             parent_workspace_id: None,
             image_ids: None,
         };

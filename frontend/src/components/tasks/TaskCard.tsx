@@ -22,6 +22,7 @@ interface TaskCardProps {
   isOpen?: boolean;
   projectId: string;
   sharedTask?: SharedTaskRecord;
+  showQueuePosition?: boolean;
 }
 
 export function TaskCard({
@@ -32,6 +33,7 @@ export function TaskCard({
   isOpen,
   projectId,
   sharedTask,
+  showQueuePosition,
 }: TaskCardProps) {
   const { t } = useTranslation('tasks');
   const navigate = useNavigateWithSearch();
@@ -107,6 +109,13 @@ export function TaskCard({
                   username: sharedTask.assignee_username ?? undefined,
                 }
               : undefined
+          }
+          left={
+            showQueuePosition && task.queue_position != null ? (
+              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-violet-500/20 text-violet-600 dark:text-violet-400 text-xs font-medium flex items-center justify-center">
+                {task.queue_position}
+              </span>
+            ) : undefined
           }
           right={
             <>

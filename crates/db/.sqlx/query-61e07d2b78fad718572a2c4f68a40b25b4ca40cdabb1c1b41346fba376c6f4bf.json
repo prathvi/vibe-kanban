@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", parent_workspace_id as \"parent_workspace_id: Uuid\", shared_task_id as \"shared_task_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE id = $1",
+  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", execution_mode as \"execution_mode!: ExecutionMode\", queue_position as \"queue_position: i32\", parent_workspace_id as \"parent_workspace_id: Uuid\", shared_task_id as \"shared_task_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE rowid = $1",
   "describe": {
     "columns": [
       {
@@ -29,23 +29,33 @@
         "type_info": "Text"
       },
       {
-        "name": "parent_workspace_id: Uuid",
+        "name": "execution_mode!: ExecutionMode",
         "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "queue_position: i32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "parent_workspace_id: Uuid",
+        "ordinal": 7,
         "type_info": "Blob"
       },
       {
         "name": "shared_task_id: Uuid",
-        "ordinal": 6,
+        "ordinal": 8,
         "type_info": "Blob"
       },
       {
         "name": "created_at!: DateTime<Utc>",
-        "ordinal": 7,
+        "ordinal": 9,
         "type_info": "Text"
       },
       {
         "name": "updated_at!: DateTime<Utc>",
-        "ordinal": 8,
+        "ordinal": 10,
         "type_info": "Text"
       }
     ],
@@ -58,11 +68,13 @@
       false,
       true,
       false,
+      false,
+      true,
       true,
       true,
       false,
       false
     ]
   },
-  "hash": "d53d6e7e8346e60b3a95779dbcb28f319866559725b5c803c52c422759749324"
+  "hash": "61e07d2b78fad718572a2c4f68a40b25b4ca40cdabb1c1b41346fba376c6f4bf"
 }

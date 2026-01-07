@@ -20,7 +20,7 @@ use db::{
         project_repo::ProjectRepo,
         repo::Repo,
         scratch::{DraftFollowUpData, Scratch, ScratchType},
-        task::{Task, TaskStatus},
+        task::{ExecutionMode, Task, TaskStatus},
         workspace::Workspace,
         workspace_repo::WorkspaceRepo,
     },
@@ -50,6 +50,7 @@ use services::services::{
     image::ImageService,
     notification::NotificationService,
     queued_message::QueuedMessageService,
+    sequential_queue::SequentialQueueService,
     share::SharePublisher,
     workspace_manager::{RepoWorkspaceInput, WorkspaceManager},
 };
@@ -76,6 +77,7 @@ pub struct LocalContainerService {
     analytics: Option<AnalyticsContext>,
     approvals: Approvals,
     queued_message_service: QueuedMessageService,
+    sequential_queue_service: SequentialQueueService,
     publisher: Result<SharePublisher, RemoteClientNotConfigured>,
     notification_service: NotificationService,
 }
@@ -96,6 +98,7 @@ impl LocalContainerService {
         let child_store = Arc::new(RwLock::new(HashMap::new()));
         let interrupt_senders = Arc::new(RwLock::new(HashMap::new()));
         let notification_service = NotificationService::new(config.clone());
+        let sequential_queue_service = SequentialQueueService::new(db.clone());
 
         let container = LocalContainerService {
             db,
@@ -108,6 +111,7 @@ impl LocalContainerService {
             analytics,
             approvals,
             queued_message_service,
+            sequential_queue_service,
             publisher,
             notification_service,
         };
@@ -462,6 +466,11 @@ impl LocalContainerService {
 
                         // Manually finalize task since we're bypassing normal execution flow
                         container.finalize_task(publisher.as_ref().ok(), &ctx).await;
+
+                        // Try to start next sequential task if applicable
+                        container
+                            .try_start_next_sequential_task(&ctx.task, &ctx)
+                            .await;
                     }
                 }
 
@@ -504,6 +513,9 @@ impl LocalContainerService {
                                 tracing::error!("Failed to start queued follow-up: {}", e);
                                 // Fall back to finalization if follow-up fails
                                 container.finalize_task(publisher.as_ref().ok(), &ctx).await;
+                                container
+                                    .try_start_next_sequential_task(&ctx.task, &ctx)
+                                    .await;
                             }
                         } else {
                             // Execution failed or was killed - discard the queued message and finalize
@@ -513,9 +525,15 @@ impl LocalContainerService {
                                 ctx.execution_process.status
                             );
                             container.finalize_task(publisher.as_ref().ok(), &ctx).await;
+                            container
+                                .try_start_next_sequential_task(&ctx.task, &ctx)
+                                .await;
                         }
                     } else {
                         container.finalize_task(publisher.as_ref().ok(), &ctx).await;
+                        container
+                            .try_start_next_sequential_task(&ctx.task, &ctx)
+                            .await;
                     }
                 }
 
@@ -601,6 +619,235 @@ impl LocalContainerService {
     pub fn dir_name_from_workspace(workspace_id: &Uuid, task_title: &str) -> String {
         let task_title_id = git_branch_id(task_title);
         format!("{}-{}", short_uuid(workspace_id), task_title_id)
+    }
+
+    /// Try to start the next task in the sequential queue after a task completes.
+    /// This is called after finalize_task to automatically process the queue.
+    /// For sequential tasks, we also merge the completed task's branch back to the base branch.
+    pub async fn try_start_next_sequential_task(
+        &self,
+        completed_task: &Task,
+        ctx: &ExecutionContext,
+    ) {
+        // Only process if task was sequential
+        if completed_task.execution_mode != ExecutionMode::Sequential {
+            return;
+        }
+
+        // For sequential tasks, merge the completed task's branch back to the target branch
+        // This ensures the next task in the queue starts with the previous task's changes
+        if let Some(ref container_ref) = ctx.workspace.container_ref {
+            let workspace_root = PathBuf::from(container_ref);
+
+            // Get workspace repos to find target branches
+            if let Ok(workspace_repos) =
+                WorkspaceRepo::find_by_workspace_id(&self.db.pool, ctx.workspace.id).await
+            {
+                for repo in &ctx.repos {
+                    let repo_path = workspace_root.join(&repo.name);
+
+                    // Find the target branch for this repo
+                    let target_branch = workspace_repos
+                        .iter()
+                        .find(|wr| wr.repo_id == repo.id)
+                        .map(|wr| wr.target_branch.clone())
+                        .unwrap_or_else(|| "main".to_string());
+
+                    // Merge the task branch back to the target branch
+                    match self.merge_sequential_task_branch(
+                        &repo.path, // Use original repo path, not symlink
+                        &ctx.workspace.branch,
+                        &target_branch,
+                    ) {
+                        Ok(()) => {
+                            tracing::info!(
+                                "Merged sequential task branch '{}' into '{}' for repo '{}'",
+                                ctx.workspace.branch,
+                                target_branch,
+                                repo.name
+                            );
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to merge sequential task branch '{}' into '{}' for repo '{}': {}",
+                                ctx.workspace.branch,
+                                target_branch,
+                                repo.name,
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check if there's a next task in the queue
+        match self
+            .sequential_queue_service
+            .process_queue_after_completion(completed_task)
+            .await
+        {
+            Ok(Some(next_task)) => {
+                tracing::info!(
+                    "Next sequential task ready: {} (position {:?}) for project {}",
+                    next_task.id,
+                    next_task.queue_position,
+                    next_task.project_id
+                );
+
+                // The task will be started when the user triggers it or through the API
+                // Auto-starting would require creating a workspace and calling start_workspace
+                // which is typically done through the task_attempts route
+            }
+            Ok(None) => {
+                tracing::debug!(
+                    "No more sequential tasks in queue for project {}",
+                    completed_task.project_id
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to process sequential queue after task {} completion: {}",
+                    completed_task.id,
+                    e
+                );
+            }
+        }
+    }
+
+    /// Merge a sequential task's branch back to the target branch.
+    /// This ensures changes from the completed task are available to subsequent tasks.
+    fn merge_sequential_task_branch(
+        &self,
+        repo_path: &Path,
+        task_branch: &str,
+        target_branch: &str,
+    ) -> Result<(), ContainerError> {
+        // Checkout target branch
+        self.git().checkout_branch(repo_path, target_branch)?;
+
+        // Merge the task branch into target (fast-forward if possible)
+        let git = GitCli::new();
+        git.git(repo_path, ["merge", "--ff-only", task_branch])
+            .or_else(|_| {
+                // If fast-forward fails, try regular merge
+                git.git(repo_path, ["merge", "--no-edit", task_branch])
+            })
+            .map_err(|e| {
+                ContainerError::Other(anyhow!(
+                    "Failed to merge branch '{}' into '{}': {}",
+                    task_branch,
+                    target_branch,
+                    e
+                ))
+            })?;
+
+        Ok(())
+    }
+
+    /// Create a sequential workspace that uses the main repo directly (no worktree).
+    /// For sequential execution mode, tasks share the same repo directory and run one at a time.
+    async fn create_sequential(
+        &self,
+        workspace: &Workspace,
+        task: &Task,
+        repositories: &[Repo],
+    ) -> Result<ContainerRef, ContainerError> {
+        // For sequential mode, we create a workspace directory with symlinks to the main repos
+        let workspace_dir_name =
+            LocalContainerService::dir_name_from_workspace(&workspace.id, &task.title);
+        let workspace_dir = WorkspaceManager::get_workspace_base_dir().join(&workspace_dir_name);
+
+        // Create the workspace directory
+        tokio::fs::create_dir_all(&workspace_dir)
+            .await
+            .map_err(|e| {
+                ContainerError::Other(anyhow!(
+                    "Failed to create sequential workspace directory: {}",
+                    e
+                ))
+            })?;
+
+        // For each repo, create a symlink to the main repo
+        for repo in repositories {
+            let symlink_path = workspace_dir.join(&repo.name);
+
+            // Skip if symlink already exists and points to correct location
+            if symlink_path.exists() {
+                if let Ok(target) = tokio::fs::read_link(&symlink_path).await {
+                    if target == repo.path {
+                        continue;
+                    }
+                }
+                // Remove existing symlink/file if it points elsewhere
+                let _ = tokio::fs::remove_file(&symlink_path).await;
+            }
+
+            // Create symlink to main repo
+            #[cfg(unix)]
+            {
+                tokio::fs::symlink(&repo.path, &symlink_path)
+                    .await
+                    .map_err(|e| {
+                        ContainerError::Other(anyhow!(
+                            "Failed to create symlink for repo '{}': {}",
+                            repo.name,
+                            e
+                        ))
+                    })?;
+            }
+            #[cfg(windows)]
+            {
+                tokio::fs::symlink_dir(&repo.path, &symlink_path)
+                    .await
+                    .map_err(|e| {
+                        ContainerError::Other(anyhow!(
+                            "Failed to create symlink for repo '{}': {}",
+                            repo.name,
+                            e
+                        ))
+                    })?;
+            }
+
+            // Create and checkout the branch on the main repo
+            // Get the target branch for this repo
+            let workspace_repos =
+                WorkspaceRepo::find_by_workspace_id(&self.db.pool, workspace.id).await?;
+            let target_branch = workspace_repos
+                .iter()
+                .find(|wr| wr.repo_id == repo.id)
+                .map(|wr| wr.target_branch.clone())
+                .unwrap_or_else(|| "main".to_string());
+
+            // Create the branch from the target branch if it doesn't exist
+            if !self
+                .git()
+                .check_branch_exists(&repo.path, &workspace.branch)?
+            {
+                self.git()
+                    .create_branch(&repo.path, &workspace.branch, &target_branch)?;
+            }
+
+            // Checkout the workspace branch
+            self.git().checkout_branch(&repo.path, &workspace.branch)?;
+        }
+
+        // Update container_ref in database
+        Workspace::update_container_ref(
+            &self.db.pool,
+            workspace.id,
+            &workspace_dir.to_string_lossy(),
+        )
+        .await?;
+
+        // Copy project files and images (same as regular workspace)
+        self.copy_files_and_images(&workspace_dir, workspace)
+            .await?;
+
+        // Create workspace config files
+        Self::create_workspace_config_files(&workspace_dir, repositories).await?;
+
+        Ok(workspace_dir.to_string_lossy().to_string())
     }
 
     async fn track_child_msgs_in_store(&self, id: Uuid, child: &mut AsyncGroupChild) {
@@ -903,10 +1150,6 @@ impl ContainerService for LocalContainerService {
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
 
-        let workspace_dir_name =
-            LocalContainerService::dir_name_from_workspace(&workspace.id, &task.title);
-        let workspace_dir = WorkspaceManager::get_workspace_base_dir().join(&workspace_dir_name);
-
         let workspace_repos =
             WorkspaceRepo::find_by_workspace_id(&self.db.pool, workspace.id).await?;
         if workspace_repos.is_empty() {
@@ -917,6 +1160,18 @@ impl ContainerService for LocalContainerService {
 
         let repositories =
             WorkspaceRepo::find_repos_for_workspace(&self.db.pool, workspace.id).await?;
+
+        // For sequential execution mode, use symlinks to main repos instead of worktrees
+        if task.execution_mode == ExecutionMode::Sequential {
+            return self
+                .create_sequential(workspace, &task, &repositories)
+                .await;
+        }
+
+        // Parallel mode: create worktrees as usual
+        let workspace_dir_name =
+            LocalContainerService::dir_name_from_workspace(&workspace.id, &task.title);
+        let workspace_dir = WorkspaceManager::get_workspace_base_dir().join(&workspace_dir_name);
 
         let target_branches: HashMap<_, _> = workspace_repos
             .iter()

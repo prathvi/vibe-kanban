@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils';
 import type {
   TaskStatus,
   ExecutorProfileId,
+  ExecutionMode,
   ImageResponse,
 } from 'shared/types';
 
@@ -78,6 +79,7 @@ type TaskFormValues = {
   title: string;
   description: string;
   status: TaskStatus;
+  executionMode: ExecutionMode;
   executorProfileId: ExecutorProfileId | null;
   repoBranches: RepoBranch[];
   autoStart: boolean;
@@ -133,6 +135,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           title: props.task.title,
           description: props.task.description || '',
           status: props.task.status,
+          executionMode: 'parallel',
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: false,
@@ -143,6 +146,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           title: props.initialTask.title,
           description: props.initialTask.description || '',
           status: 'todo',
+          executionMode: 'parallel',
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: true,
@@ -155,6 +159,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           title: '',
           description: '',
           status: 'todo',
+          executionMode: 'parallel',
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: true,
@@ -172,6 +177,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
             title: value.title,
             description: value.description,
             status: value.status,
+            execution_mode: null,
             parent_workspace_id: null,
             image_ids: images.length > 0 ? images.map((img) => img.id) : null,
           },
@@ -181,17 +187,20 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
     } else {
       const imageIds =
         newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : null;
+      // Sequential tasks should not auto-start (they queue instead)
+      const isSequential = value.executionMode === 'sequential';
       const task = {
         project_id: projectId,
         title: value.title,
         description: value.description,
         status: null,
+        execution_mode: value.executionMode,
         parent_workspace_id:
           mode === 'subtask' ? props.parentTaskAttemptId : null,
         image_ids: imageIds,
         shared_task_id: null,
       };
-      const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
+      const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current && !isSequential;
       if (shouldAutoStart) {
         const repos = value.repoBranches.map((rb) => ({
           repo_id: rb.repoId,
@@ -627,29 +636,60 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
               </Button>
             </div>
 
-            {/* Autostart switch */}
+            {/* Execution mode and Autostart switches */}
             <div className="flex items-center gap-3">
               {!editMode && (
-                <form.Field name="autoStart">
+                <form.Field name="executionMode">
                   {(field) => (
                     <div className="flex items-center gap-2">
                       <Switch
-                        id="autostart-switch"
-                        checked={field.state.value}
+                        id="queue-switch"
+                        checked={field.state.value === 'sequential'}
                         onCheckedChange={(checked) =>
-                          field.handleChange(checked)
+                          field.handleChange(checked ? 'sequential' : 'parallel')
                         }
                         disabled={isSubmitting}
-                        className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
-                        aria-label={t('taskFormDialog.startLabel')}
+                        className="data-[state=checked]:bg-violet-600 dark:data-[state=checked]:bg-violet-500"
+                        aria-label="Add to Queue"
                       />
                       <Label
-                        htmlFor="autostart-switch"
+                        htmlFor="queue-switch"
                         className="text-sm cursor-pointer"
                       >
-                        {t('taskFormDialog.startLabel')}
+                        Queue
                       </Label>
                     </div>
+                  )}
+                </form.Field>
+              )}
+              {!editMode && (
+                <form.Field name="executionMode">
+                  {(execModeField) => (
+                    <form.Field name="autoStart">
+                      {(field) => (
+                        <div className={cn(
+                          "flex items-center gap-2",
+                          execModeField.state.value === 'sequential' && "opacity-50"
+                        )}>
+                          <Switch
+                            id="autostart-switch"
+                            checked={field.state.value && execModeField.state.value !== 'sequential'}
+                            onCheckedChange={(checked) =>
+                              field.handleChange(checked)
+                            }
+                            disabled={isSubmitting || execModeField.state.value === 'sequential'}
+                            className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
+                            aria-label={t('taskFormDialog.startLabel')}
+                          />
+                          <Label
+                            htmlFor="autostart-switch"
+                            className="text-sm cursor-pointer"
+                          >
+                            {t('taskFormDialog.startLabel')}
+                          </Label>
+                        </div>
+                      )}
+                    </form.Field>
                   )}
                 </form.Field>
               )}

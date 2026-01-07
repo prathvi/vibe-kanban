@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE projects\n               SET vortex_last_sync_at = datetime('now')\n               WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "b30a396690881b005790b8811bb8b1c3d42c2d166fe45bd2f24b9841ab9710c6"
+}

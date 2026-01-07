@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, fs, path::Path};
 
-use schemars::{generate::SchemaSettings, JsonSchema, Schema, SchemaGenerator};
+use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use server::routes::task_attempts::pr::DEFAULT_PR_DESCRIPTION_PROMPT;
 use ts_rs::TS;
 
@@ -31,6 +31,7 @@ fn generate_types_content() -> String {
         db::models::tag::CreateTag::decl(),
         db::models::tag::UpdateTag::decl(),
         db::models::task::TaskStatus::decl(),
+        db::models::task::ExecutionMode::decl(),
         db::models::task::Task::decl(),
         db::models::task::TaskWithAttemptStatus::decl(),
         db::models::task::TaskRelationships::decl(),
@@ -169,6 +170,15 @@ fn generate_types_content() -> String {
         server::routes::gitlab_issues::ImportGitLabIssueRequest::decl(),
         server::routes::gitlab_issues::ImportGitLabIssueResponse::decl(),
         server::routes::gitlab_issues::GitLabConfigStatus::decl(),
+        services::services::vortex_issues::VortexIssue::decl(),
+        services::services::vortex_issues::VortexUser::decl(),
+        services::services::vortex_issues::VortexAttachment::decl(),
+        services::services::vortex_issues::VortexComment::decl(),
+        services::services::vortex_issues::ListVortexIssuesParams::decl(),
+        server::routes::vortex_issues::VortexIssuesResponse::decl(),
+        server::routes::vortex_issues::ImportVortexIssueRequest::decl(),
+        server::routes::vortex_issues::ImportVortexIssueResponse::decl(),
+        server::routes::vortex_issues::VortexConfigStatus::decl(),
         server::routes::task_attempts::RepoBranchStatus::decl(),
         services::services::filesystem::DirectoryEntry::decl(),
         services::services::filesystem::DirectoryListResponse::decl(),

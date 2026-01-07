@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{
-    dangerous::insecure_decode, decode, encode, DecodingKey, EncodingKey, Header, Validation,
+    DecodingKey, EncodingKey, Header, Validation, dangerous::insecure_decode, decode, encode,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

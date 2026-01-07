@@ -4,7 +4,10 @@ use axum::{
     response::Json as ResponseJson,
     routing::{get, post},
 };
-use db::models::{project::Project, task::{CreateTask, Task, TaskStatus}};
+use db::models::{
+    project::Project,
+    task::{CreateTask, Task, TaskStatus},
+};
 use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use services::services::gitlab_issues::{GitLabIssue, GitLabIssuesService, ListGitLabIssuesParams};
@@ -135,6 +138,7 @@ pub async fn import_gitlab_issue(
         title: issue.title.clone(),
         description: Some(description),
         status: Some(TaskStatus::Todo),
+        execution_mode: None,
         parent_workspace_id: None,
         image_ids: None,
         shared_task_id: None,
@@ -154,10 +158,9 @@ pub async fn import_gitlab_issue(
         )
         .await;
 
-    Ok(ResponseJson(ApiResponse::success(ImportGitLabIssueResponse {
-        task,
-        issue,
-    })))
+    Ok(ResponseJson(ApiResponse::success(
+        ImportGitLabIssueResponse { task, issue },
+    )))
 }
 
 pub async fn sync_gitlab_issues(
@@ -191,18 +194,17 @@ pub async fn sync_gitlab_issues(
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let existing_tasks = Task::find_by_project_id_with_attempt_status(&deployment.db().pool, project.id).await?;
+    let existing_tasks =
+        Task::find_by_project_id_with_attempt_status(&deployment.db().pool, project.id).await?;
     let existing_issue_iids: Vec<i64> = existing_tasks
         .iter()
         .filter_map(|t| {
             t.description.as_ref().and_then(|d| {
                 if d.starts_with("Imported from GitLab Issue #") {
-                    d.lines()
-                        .next()
-                        .and_then(|line| {
-                            line.strip_prefix("Imported from GitLab Issue #")
-                                .and_then(|s| s.parse::<i64>().ok())
-                        })
+                    d.lines().next().and_then(|line| {
+                        line.strip_prefix("Imported from GitLab Issue #")
+                            .and_then(|s| s.parse::<i64>().ok())
+                    })
                 } else {
                     None
                 }
@@ -229,6 +231,7 @@ pub async fn sync_gitlab_issues(
             title: issue.title.clone(),
             description: Some(description),
             status: Some(TaskStatus::Todo),
+            execution_mode: None,
             parent_workspace_id: None,
             image_ids: None,
             shared_task_id: None,
@@ -236,10 +239,7 @@ pub async fn sync_gitlab_issues(
 
         let task_id = Uuid::new_v4();
         let task = Task::create(&deployment.db().pool, &create_task, task_id).await?;
-        imported.push(ImportGitLabIssueResponse {
-            task,
-            issue,
-        });
+        imported.push(ImportGitLabIssueResponse { task, issue });
     }
 
     Project::update_gitlab_last_sync(&deployment.db().pool, project.id).await?;
