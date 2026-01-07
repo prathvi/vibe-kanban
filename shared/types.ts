@@ -46,7 +46,7 @@ export type TaskStatus = "todo" | "inprogress" | "inreview" | "done" | "cancelle
 
 export type Task = { id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
 
-export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
+export type TaskWithAttemptStatus = { has_in_progress_attempt: boolean, last_attempt_failed: boolean, executor: string, latest_workspace_id: string | null, latest_workspace_container_ref: string | null, id: string, project_id: string, title: string, description: string | null, status: TaskStatus, parent_workspace_id: string | null, shared_task_id: string | null, created_at: string, updated_at: string, };
 
 export type TaskRelationships = { parent_task: Task | null, current_workspace: Workspace, children: Array<Task>, };
 
@@ -295,6 +295,8 @@ conflict_op: ConflictOp | null,
 conflicted_files: Array<string>, };
 
 export type RunScriptError = { "type": "no_script_configured" } | { "type": "process_already_running" };
+
+export type DeleteWorktreeError = { "type": "task_not_done" } | { "type": "no_worktree_exists" } | { "type": "has_running_processes" };
 
 export type AttachPrResponse = { pr_attached: boolean, pr_url: string | null, pr_number: bigint | null, pr_status: MergeStatus | null, };
 

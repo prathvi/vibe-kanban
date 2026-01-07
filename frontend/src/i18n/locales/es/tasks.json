@@ -15,6 +15,7 @@
     "stopShare": "Dejar de compartir",
     "duplicate": "Duplicate",
     "editBranchName": "Editar nombre de rama",
+    "deleteWorktree": "Eliminar worktree",
     "gitActions": "Acciones de Git",
     "openInIde": "Open attempt in IDE",
     "task": "Task",

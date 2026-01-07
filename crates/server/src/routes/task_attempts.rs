@@ -19,7 +19,7 @@ use axum::{
     http::StatusCode,
     middleware::from_fn_with_state,
     response::{IntoResponse, Json as ResponseJson},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use db::models::{
     execution_process::{ExecutionProcess, ExecutionProcessRunReason, ExecutionProcessStatus},
@@ -56,6 +56,7 @@ use crate::{
     DeploymentImpl, error::ApiError, middleware::load_workspace_middleware,
     routes::task_attempts::gh_cli_setup::GhCliSetupError,
 };
+use services::services::workspace_manager::WorkspaceManager;
 
 #[derive(Debug, Deserialize, Serialize, TS)]
 pub struct RebaseTaskAttemptRequest {
@@ -1477,6 +1478,97 @@ pub async fn get_task_attempt_repos(
     Ok(ResponseJson(ApiResponse::success(repos)))
 }
 
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(tag = "type", rename_all = "snake_case")]
+pub enum DeleteWorktreeError {
+    TaskNotDone,
+    NoWorktreeExists,
+    HasRunningProcesses,
+}
+
+#[axum::debug_handler]
+pub async fn delete_worktree(
+    Extension(workspace): Extension<Workspace>,
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<(), DeleteWorktreeError>>, ApiError> {
+    let pool = &deployment.db().pool;
+
+    // Get the parent task
+    let task = workspace
+        .parent_task(pool)
+        .await?
+        .ok_or(ApiError::Workspace(WorkspaceError::TaskNotFound))?;
+
+    // Validate task is in Done or Cancelled status
+    if !matches!(task.status, TaskStatus::Done | TaskStatus::Cancelled) {
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            DeleteWorktreeError::TaskNotDone,
+        )));
+    }
+
+    // Check if worktree exists
+    let container_ref = match &workspace.container_ref {
+        Some(cr) if !cr.is_empty() => cr.clone(),
+        _ => {
+            return Ok(ResponseJson(ApiResponse::error_with_data(
+                DeleteWorktreeError::NoWorktreeExists,
+            )));
+        }
+    };
+
+    // Validate no running execution processes
+    if ExecutionProcess::has_running_processes_for_workspace(pool, workspace.id).await? {
+        return Ok(ResponseJson(ApiResponse::error_with_data(
+            DeleteWorktreeError::HasRunningProcesses,
+        )));
+    }
+
+    // Get repositories for cleanup
+    let repositories = WorkspaceRepo::find_repos_for_workspace(pool, workspace.id).await?;
+
+    let workspace_dir = PathBuf::from(&container_ref);
+    let branch = workspace.branch.clone();
+    let workspace_id = workspace.id;
+
+    // Clear container_ref in database first
+    Workspace::clear_container_ref(pool, workspace_id).await?;
+
+    // Spawn background cleanup
+    tokio::spawn(async move {
+        tracing::info!(
+            "Starting worktree cleanup for workspace {} at {}",
+            workspace_id,
+            workspace_dir.display()
+        );
+
+        if let Err(e) =
+            WorkspaceManager::cleanup_workspace(&workspace_dir, &repositories, &branch).await
+        {
+            tracing::error!(
+                "Worktree cleanup failed for workspace {} at {}: {}",
+                workspace_id,
+                workspace_dir.display(),
+                e
+            );
+        } else {
+            tracing::info!("Worktree cleanup completed for workspace {}", workspace_id);
+        }
+    });
+
+    deployment
+        .track_if_analytics_allowed(
+            "worktree_deleted",
+            serde_json::json!({
+                "workspace_id": workspace_id.to_string(),
+                "task_id": task.id.to_string(),
+            }),
+        )
+        .await;
+
+    Ok(ResponseJson(ApiResponse::success(())))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_attempt_id_router = Router::new()
         .route("/", get(get_task_attempt))
@@ -1501,6 +1593,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/change-target-branch", post(change_target_branch))
         .route("/rename-branch", post(rename_branch))
         .route("/repos", get(get_task_attempt_repos))
+        .route("/worktree", delete(delete_worktree))
         .layer(from_fn_with_state(
             deployment.clone(),
             load_workspace_middleware,

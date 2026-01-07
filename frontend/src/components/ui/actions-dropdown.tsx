@@ -13,6 +13,7 @@ import type { TaskWithAttemptStatus } from 'shared/types';
 import type { Workspace } from 'shared/types';
 import { useOpenInEditor } from '@/hooks/useOpenInEditor';
 import { DeleteTaskConfirmationDialog } from '@/components/dialogs/tasks/DeleteTaskConfirmationDialog';
+import { DeleteWorktreeConfirmationDialog } from '@/components/dialogs/tasks/DeleteWorktreeConfirmationDialog';
 import { ViewProcessesDialog } from '@/components/dialogs/tasks/ViewProcessesDialog';
 import { ViewRelatedTasksDialog } from '@/components/dialogs/tasks/ViewRelatedTasksDialog';
 import { CreateAttemptDialog } from '@/components/dialogs/tasks/CreateAttemptDialog';
@@ -140,6 +141,25 @@ export function ActionsDropdown({
       currentBranchName: attempt.branch,
     });
   };
+
+  const handleDeleteWorktree = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Use attempt if available, otherwise use task's latest workspace info
+    const workspaceId = attempt?.id ?? task?.latest_workspace_id;
+    const containerRef =
+      attempt?.container_ref ?? task?.latest_workspace_container_ref;
+    if (!workspaceId || !containerRef) return;
+    try {
+      await DeleteWorktreeConfirmationDialog.show({
+        workspaceId,
+        containerRef,
+        branch: attempt?.branch,
+      });
+    } catch {
+      // User cancelled or error occurred
+    }
+  };
+
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!task || isShared) return;
@@ -222,6 +242,16 @@ export function ActionsDropdown({
               >
                 {t('actionsMenu.editBranchName')}
               </DropdownMenuItem>
+              {(task?.status === 'done' || task?.status === 'cancelled') &&
+                (attempt?.container_ref ||
+                  task?.latest_workspace_container_ref) && (
+                  <DropdownMenuItem
+                    onClick={handleDeleteWorktree}
+                    className="text-destructive"
+                  >
+                    {t('actionsMenu.deleteWorktree')}
+                  </DropdownMenuItem>
+                )}
               <DropdownMenuSeparator />
             </>
           )}
@@ -265,6 +295,16 @@ export function ActionsDropdown({
               >
                 {t('common:buttons.delete')}
               </DropdownMenuItem>
+              {!hasAttemptActions &&
+                (task?.status === 'done' || task?.status === 'cancelled') &&
+                task?.latest_workspace_container_ref && (
+                  <DropdownMenuItem
+                    onClick={handleDeleteWorktree}
+                    className="text-destructive"
+                  >
+                    {t('actionsMenu.deleteWorktree')}
+                  </DropdownMenuItem>
+                )}
             </>
           )}
         </DropdownMenuContent>

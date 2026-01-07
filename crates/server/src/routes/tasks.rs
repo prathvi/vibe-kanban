@@ -245,6 +245,8 @@ pub async fn create_task_and_start(
         has_in_progress_attempt: is_attempt_running,
         last_attempt_failed: false,
         executor: payload.executor_profile_id.executor.to_string(),
+        latest_workspace_id: Some(workspace.id),
+        latest_workspace_container_ref: workspace.container_ref.clone(),
     })))
 }
 

@@ -322,6 +322,7 @@
     "createSubtask": "创建子任务",
     "gitActions": "Git 操作",
     "editBranchName": "编辑分支名称",
+    "deleteWorktree": "删除工作树",
     "task": "任务",
     "share": "共享",
     "reassign": "重新分配",

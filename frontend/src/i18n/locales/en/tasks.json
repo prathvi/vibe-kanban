@@ -322,6 +322,7 @@
     "createSubtask": "Create subtask",
     "gitActions": "Git actions",
     "editBranchName": "Edit branch name",
+    "deleteWorktree": "Delete worktree",
     "task": "Task",
     "share": "Share",
     "reassign": "Reassign",

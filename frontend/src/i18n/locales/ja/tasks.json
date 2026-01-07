@@ -15,6 +15,7 @@
     "stopShare": "共有を停止",
     "duplicate": "Duplicate",
     "editBranchName": "ブランチ名を編集",
+    "deleteWorktree": "ワークツリーを削除",
     "gitActions": "Gitアクション",
     "openInIde": "Open attempt in IDE",
     "task": "Task",

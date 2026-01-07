@@ -311,6 +311,24 @@ impl ExecutionProcess {
         Ok(count > 0)
     }
 
+    /// Check if there are any running processes for a workspace (including dev servers)
+    pub async fn has_running_processes_for_workspace(
+        pool: &SqlitePool,
+        workspace_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) as "count!: i64"
+               FROM execution_processes ep
+               JOIN sessions s ON ep.session_id = s.id
+               WHERE s.workspace_id = $1
+                 AND ep.status = 'running'"#,
+            workspace_id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(count > 0)
+    }
+
     /// Find running dev servers for a specific workspace (across all sessions)
     pub async fn find_running_dev_servers_by_workspace(
         pool: &SqlitePool,
