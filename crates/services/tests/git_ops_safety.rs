@@ -770,7 +770,7 @@ fn rebase_applies_multiple_commits_onto_ahead_base() {
 }
 
 #[test]
-fn merge_when_base_ahead_and_feature_ahead_fails() {
+fn merge_when_base_ahead_and_feature_ahead_succeeds() {
     let td = TempDir::new().unwrap();
     let (repo_path, worktree_path) = setup_repo_with_worktree(&td);
     let repo = Repository::open(&repo_path).unwrap();
@@ -787,7 +787,7 @@ fn merge_when_base_ahead_and_feature_ahead_fails() {
     let g = GitService::new();
     let before_main = g.get_branch_oid(&repo_path, "main").unwrap();
 
-    // Attempt to merge (squash) into main - should fail because base is ahead
+    // Attempt to merge (squash) into main - should now succeed even when base is ahead
     let service = GitService::new();
     let res = service.merge_changes(
         &repo_path,
@@ -798,20 +798,20 @@ fn merge_when_base_ahead_and_feature_ahead_fails() {
     );
 
     assert!(
-        res.is_err(),
-        "merge should fail when base branch is ahead of task branch"
+        res.is_ok(),
+        "merge should succeed even when base branch is ahead of task branch"
     );
 
-    // Verify main branch was not modified
+    // Verify main branch was modified (new commit was created)
     let after_main = g.get_branch_oid(&repo_path, "main").unwrap();
-    assert_eq!(
+    assert_ne!(
         before_main, after_main,
-        "main ref should remain unchanged when merge fails"
+        "main ref should be updated after successful merge"
     );
 }
 
 #[test]
-fn merge_conflict_does_not_move_base_ref() {
+fn merge_conflict_auto_resolves_in_favor_of_task_branch() {
     let td = TempDir::new().unwrap();
     let (repo_path, worktree_path) = setup_direct_conflict_repo(&td);
 
@@ -829,15 +829,22 @@ fn merge_conflict_does_not_move_base_ref() {
         "squash merge",
     );
 
-    assert!(res.is_err(), "conflicting merge should fail");
+    // Merge should now succeed by auto-resolving conflicts in favor of task branch
+    assert!(
+        res.is_ok(),
+        "conflicting merge should succeed by auto-resolving in favor of task branch"
+    );
 
     let after = g.get_branch_oid(&repo_path, "main").unwrap();
-    assert_eq!(before, after, "main ref must remain unchanged on conflict");
+    assert_ne!(
+        before, after,
+        "main ref should be updated after successful merge"
+    );
 }
 
 #[test]
-fn merge_delete_vs_modify_conflict_behaves_safely() {
-    // main modifies file, feature deletes it -> but now blocked by branch ahead check
+fn merge_delete_vs_modify_conflict_resolves_in_favor_of_task() {
+    // main modifies file, feature deletes it -> deletion should win (task branch takes precedence)
     let td = TempDir::new().unwrap();
     let (repo_path, worktree_path) = setup_repo_with_worktree(&td);
     let repo = Repository::open(&repo_path).unwrap();
@@ -872,12 +879,18 @@ fn merge_delete_vs_modify_conflict_behaves_safely() {
         "squash merge",
     );
 
-    // Should now fail due to base branch being ahead, not due to merge conflicts
-    assert!(res.is_err(), "merge should fail when base branch is ahead");
+    // Merge should succeed by auto-resolving conflicts in favor of task branch
+    assert!(
+        res.is_ok(),
+        "merge should succeed with conflict auto-resolved in favor of task branch"
+    );
 
-    // Ensure base ref unchanged on failure
+    // Ensure base ref was updated
     let after = g.get_branch_oid(&repo_path, "main").unwrap();
-    assert_eq!(before, after, "main ref must remain unchanged on failure");
+    assert_ne!(
+        before, after,
+        "main ref should be updated after successful merge"
+    );
 }
 
 #[test]
@@ -1081,7 +1094,7 @@ fn init_repo_only_service(root: &TempDir) -> PathBuf {
 }
 
 #[test]
-fn merge_binary_conflict_does_not_move_ref() {
+fn merge_binary_conflict_resolves_in_favor_of_task() {
     let td = TempDir::new().unwrap();
     let repo_path = init_repo_only_service(&td);
     let repo = Repository::open(&repo_path).unwrap();
@@ -1106,9 +1119,16 @@ fn merge_binary_conflict_does_not_move_ref() {
 
     let before = s.get_branch_oid(&repo_path, "main").unwrap();
     let res = s.merge_changes(&repo_path, &worktree_path, "feature", "main", "merge bin");
-    assert!(res.is_err(), "binary conflict should fail");
+    // Binary conflicts should now be auto-resolved in favor of task branch
+    assert!(
+        res.is_ok(),
+        "binary conflict should be auto-resolved in favor of task branch"
+    );
     let after = s.get_branch_oid(&repo_path, "main").unwrap();
-    assert_eq!(before, after, "main ref unchanged on conflict");
+    assert_ne!(
+        before, after,
+        "main ref should be updated after successful merge"
+    );
 }
 
 #[test]
@@ -1354,7 +1374,7 @@ fn merge_into_orphaned_branch_uses_libgit2_fallback() {
 }
 
 #[test]
-fn merge_base_ahead_of_task_should_error() {
+fn merge_base_ahead_of_task_should_succeed() {
     let td = TempDir::new().unwrap();
     let repo_path = td.path().join("repo");
     let worktree_path = td.path().join("wt-feature");
@@ -1390,7 +1410,7 @@ fn merge_base_ahead_of_task_should_error() {
     commit_all(&repo, "main advances further");
 
     // Attempt to merge feature into main when main is ahead
-    // This should error because base branch has moved ahead of task branch
+    // This should now succeed by rebasing and merging, or auto-resolving conflicts
     let res = service.merge_changes(
         &repo_path,
         &worktree_path,
@@ -1399,10 +1419,9 @@ fn merge_base_ahead_of_task_should_error() {
         "attempt merge when base ahead",
     );
 
-    // TDD: This test will initially fail because merge currently succeeds
-    // Later we'll fix the merge logic to detect this scenario and error
+    // Merge should succeed even when base branch is ahead of task branch
     assert!(
-        res.is_err(),
-        "Merge should error when base branch is ahead of task branch"
+        res.is_ok(),
+        "Merge should succeed even when base branch is ahead of task branch"
     );
 }

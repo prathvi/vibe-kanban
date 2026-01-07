@@ -794,29 +794,53 @@ impl GitService {
         let task_repo = self.open_repo(task_worktree_path)?;
         let base_repo = self.open_repo(base_worktree_path)?;
 
-        // Check if base branch is ahead of task branch - if so, rebase task branch first
+        // Check if base branch is ahead of task branch - if so, try to rebase task branch first
         let (_, task_behind) =
             self.get_branch_status(base_worktree_path, task_branch_name, base_branch_name)?;
 
         if task_behind > 0 {
             tracing::info!(
-                "Base branch '{}' is {} commits ahead of task branch '{}'. Rebasing task branch first.",
+                "Base branch '{}' is {} commits ahead of task branch '{}'. Attempting to rebase task branch first.",
                 base_branch_name, task_behind, task_branch_name
             );
 
-            // Rebase task branch onto base branch before merging
-            self.rebase_branch(
+            // Try to rebase task branch onto base branch before merging
+            // If rebase fails due to conflicts, we'll still proceed with the merge
+            match self.rebase_branch(
                 base_worktree_path,
                 task_worktree_path,
                 base_branch_name,
                 base_branch_name, // old_base = new_base since we're just updating
                 task_branch_name,
-            )?;
-
-            tracing::info!(
-                "Successfully rebased task branch '{}' onto '{}'",
-                task_branch_name, base_branch_name
-            );
+            ) {
+                Ok(_) => {
+                    tracing::info!(
+                        "Successfully rebased task branch '{}' onto '{}'",
+                        task_branch_name, base_branch_name
+                    );
+                }
+                Err(GitServiceError::MergeConflicts(msg)) => {
+                    tracing::warn!(
+                        "Rebase encountered conflicts, aborting rebase and proceeding with direct merge: {}",
+                        msg
+                    );
+                    // Abort the rebase so we can proceed with direct merge
+                    self.abort_conflicts(task_worktree_path)?;
+                }
+                Err(GitServiceError::RebaseInProgress) => {
+                    tracing::warn!(
+                        "Rebase already in progress, aborting and proceeding with direct merge"
+                    );
+                    self.abort_conflicts(task_worktree_path)?;
+                }
+                Err(e) => {
+                    // For other errors, still try to proceed with merge
+                    tracing::warn!(
+                        "Rebase failed with error: {}. Proceeding with direct merge.",
+                        e
+                    );
+                }
+            }
         }
 
         // Check where base branch is checked out (if anywhere)
@@ -1286,7 +1310,8 @@ impl GitService {
         Ok(branches)
     }
 
-    /// Perform a squash merge of task branch into base branch, but fail on conflicts
+    /// Perform a squash merge of task branch into base branch.
+    /// If there are conflicts, they are auto-resolved in favor of the task branch (theirs).
     fn perform_squash_merge(
         &self,
         repo: &Repository,
@@ -1296,18 +1321,45 @@ impl GitService {
         commit_message: &str,
         base_branch_name: &str,
     ) -> Result<git2::Oid, GitServiceError> {
-        // In-memory merge to detect conflicts without touching the working tree
+        // In-memory merge
         let mut merge_opts = git2::MergeOptions::new();
         // Safety and correctness options
         merge_opts.find_renames(true); // improve rename handling
-        merge_opts.fail_on_conflict(true); // bail out instead of generating conflicted index
+        // Don't fail on conflict - we'll handle conflicts by favoring task branch changes
+        merge_opts.fail_on_conflict(false);
         let mut index = repo.merge_commits(base_commit, task_commit, Some(&merge_opts))?;
 
-        // If there are conflicts, return an error
+        // If there are conflicts, resolve them in favor of the task branch (theirs)
         if index.has_conflicts() {
-            return Err(GitServiceError::MergeConflicts(
-                "Merge failed due to conflicts. Please resolve conflicts manually.".to_string(),
-            ));
+            tracing::warn!(
+                "Merge has conflicts, auto-resolving in favor of task branch changes"
+            );
+
+            // Collect all conflict entries and resolve them
+            let conflicts: Vec<_> = index.conflicts()?.collect();
+            for conflict_result in conflicts {
+                let conflict = conflict_result?;
+
+                // Get the path from any of the conflict entries
+                let path = conflict
+                    .their
+                    .as_ref()
+                    .or(conflict.our.as_ref())
+                    .or(conflict.ancestor.as_ref())
+                    .and_then(|e| String::from_utf8(e.path.clone()).ok());
+
+                if let Some(ref path_str) = path {
+                    // Remove the conflict entry
+                    index.remove_path(std::path::Path::new(path_str))?;
+
+                    // Add the "theirs" (task branch) version if it exists
+                    if let Some(their_entry) = &conflict.their {
+                        index.add(&their_entry.clone())?;
+                    }
+                    // If "theirs" doesn't exist (file was deleted in task branch),
+                    // we just don't add it back - effectively accepting the deletion
+                }
+            }
         }
 
         // Write the merged tree back to the repository

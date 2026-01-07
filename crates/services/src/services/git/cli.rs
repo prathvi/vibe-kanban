@@ -576,6 +576,7 @@ impl GitCli {
     }
 
     /// Checkout base branch, squash-merge from_branch, and commit with message. Returns new HEAD sha.
+    /// If there are conflicts, they are auto-resolved in favor of the from_branch (theirs).
     pub fn merge_squash_commit(
         &self,
         repo_path: &Path,
@@ -584,8 +585,39 @@ impl GitCli {
         message: &str,
     ) -> Result<String, GitCliError> {
         self.git(repo_path, ["checkout", base_branch]).map(|_| ())?;
-        self.git(repo_path, ["merge", "--squash", "--no-commit", from_branch])
-            .map(|_| ())?;
+
+        // Try merge with -X theirs to auto-resolve conflicts in favor of the task branch
+        match self.git(
+            repo_path,
+            [
+                "merge",
+                "--squash",
+                "--no-commit",
+                "-X",
+                "theirs",
+                from_branch,
+            ],
+        ) {
+            Ok(_) => {}
+            Err(_) => {
+                // If merge still has conflicts (e.g., delete/modify conflicts),
+                // resolve them by checking out theirs for each conflicted file
+                let conflicts = self.get_conflicted_files(repo_path).unwrap_or_default();
+                for file in conflicts {
+                    // Try to checkout theirs, if it fails (file was deleted in theirs),
+                    // just remove it from index
+                    if self
+                        .git(repo_path, ["checkout", "--theirs", "--", &file])
+                        .is_err()
+                    {
+                        let _ = self.git(repo_path, ["rm", "--cached", &file]);
+                    } else {
+                        let _ = self.git(repo_path, ["add", &file]);
+                    }
+                }
+            }
+        }
+
         self.git(repo_path, ["commit", "-m", message]).map(|_| ())?;
         let sha = self
             .git(repo_path, ["rev-parse", "HEAD"])?
