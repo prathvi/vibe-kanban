@@ -134,9 +134,11 @@ async fn import_vortex_attachments(
             Ok(data) => match image_service.store_image(&data, &attachment.filename).await {
                 Ok(image) => {
                     tracing::debug!("Imported Vortex attachment: {}", attachment.filename);
+                    let markdown_path =
+                        format!("{}/{}", utils::path::VIBE_IMAGES_DIR, image.file_path);
                     images.push(ImportedImage {
                         id: image.id,
-                        file_path: image.file_path,
+                        file_path: markdown_path,
                         original_name: attachment.filename.clone(),
                     });
                 }
