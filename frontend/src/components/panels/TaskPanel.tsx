@@ -104,7 +104,7 @@ const TaskPanel = ({ task }: TaskPanelProps) => {
           <div className="space-y-3 overflow-y-auto flex-shrink min-h-0">
             <WYSIWYGEditor value={titleContent} disabled />
             {descriptionContent && (
-              <WYSIWYGEditor value={descriptionContent} disabled />
+              <WYSIWYGEditor value={descriptionContent} disabled taskId={task.id} />
             )}
           </div>
 

@@ -103,13 +103,19 @@ pub async fn list_vortex_issues(
     })))
 }
 
+struct ImportedImage {
+    id: Uuid,
+    file_path: String,
+    original_name: String,
+}
+
 async fn import_vortex_attachments(
     image_service: &ImageService,
     vortex_service: &VortexIssuesService,
     token: &str,
     attachments: &[VortexAttachment],
-) -> Vec<Uuid> {
-    let mut image_ids = Vec::new();
+) -> Vec<ImportedImage> {
+    let mut images = Vec::new();
 
     for attachment in attachments {
         if !attachment.is_image {
@@ -128,7 +134,11 @@ async fn import_vortex_attachments(
             Ok(data) => match image_service.store_image(&data, &attachment.filename).await {
                 Ok(image) => {
                     tracing::debug!("Imported Vortex attachment: {}", attachment.filename);
-                    image_ids.push(image.id);
+                    images.push(ImportedImage {
+                        id: image.id,
+                        file_path: image.file_path,
+                        original_name: attachment.filename.clone(),
+                    });
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -148,7 +158,7 @@ async fn import_vortex_attachments(
         }
     }
 
-    image_ids
+    images
 }
 
 pub async fn import_vortex_issue(
@@ -179,17 +189,30 @@ pub async fn import_vortex_issue(
 
     let image_service = ImageService::new(deployment.db().pool.clone())?;
 
-    let image_ids =
+    let imported_images =
         import_vortex_attachments(&image_service, &vortex_service, &token, &attachments).await;
 
     let issue_url = format!("https://vortextask.com/issues/{}", payload.issue_id);
 
+    let images_markdown = if !imported_images.is_empty() {
+        let image_lines: Vec<String> = imported_images
+            .iter()
+            .map(|img| format!("![{}]({})", img.original_name, img.file_path))
+            .collect();
+        format!("\n\n## Attachments\n\n{}", image_lines.join("\n\n"))
+    } else {
+        String::new()
+    };
+
     let description = format!(
-        "Imported from Vortex Issue #{}\n{}\n\n{}",
+        "Imported from Vortex Issue #{}\n{}\n\n{}{}",
         issue.key,
         issue_url,
-        issue.description.clone().unwrap_or_default()
+        issue.description.clone().unwrap_or_default(),
+        images_markdown
     );
+
+    let image_ids: Vec<Uuid> = imported_images.iter().map(|img| img.id).collect();
 
     let create_task = CreateTask {
         project_id: project.id,
@@ -290,17 +313,30 @@ pub async fn sync_vortex_issues(
             .await
             .unwrap_or_default();
 
-        let image_ids =
+        let imported_images =
             import_vortex_attachments(&image_service, &vortex_service, &token, &attachments).await;
 
         let issue_url = format!("https://vortextask.com/issues/{}", issue.id);
 
+        let images_markdown = if !imported_images.is_empty() {
+            let image_lines: Vec<String> = imported_images
+                .iter()
+                .map(|img| format!("![{}]({})", img.original_name, img.file_path))
+                .collect();
+            format!("\n\n## Attachments\n\n{}", image_lines.join("\n\n"))
+        } else {
+            String::new()
+        };
+
         let description = format!(
-            "Imported from Vortex Issue #{}\n{}\n\n{}",
+            "Imported from Vortex Issue #{}\n{}\n\n{}{}",
             issue.key,
             issue_url,
-            issue.description.clone().unwrap_or_default()
+            issue.description.clone().unwrap_or_default(),
+            images_markdown
         );
+
+        let image_ids: Vec<Uuid> = imported_images.iter().map(|img| img.id).collect();
 
         let create_task = CreateTask {
             project_id: project.id,
