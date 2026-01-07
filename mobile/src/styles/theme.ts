@@ -1,0 +1,85 @@
+import { StyleSheet } from 'react-native';
+
+export const colors = {
+  background: '#2a2826',
+  backgroundLight: '#f8f6f1',
+  foreground: '#d9d5cf',
+  foregroundLight: '#020817',
+  muted: '#302e2c',
+  mutedForeground: '#d9d5cf',
+  mutedLight: '#ffffff',
+  border: '#403d3a',
+  borderLight: '#e2e8f0',
+  statusInit: '#3b82f6',
+  statusRunning: '#db8200',
+  statusComplete: '#16a34a',
+  statusFailed: '#ef4444',
+  statusPaused: '#1e293b',
+  success: '#22c55e',
+  successForeground: '#f0fdf4',
+  warning: '#db8200',
+  warningForeground: '#451a03',
+  destructive: '#a85454',
+  destructiveForeground: '#2a2826',
+  primary: '#302e2c',
+  primaryForeground: '#d9d5cf',
+  card: '#302e2c',
+  cardForeground: '#d9d5cf',
+  white: '#ffffff',
+  black: '#000000',
+  transparent: 'transparent',
+};
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+};
+
+export const borderRadius = {
+  sm: 4,
+  md: 6,
+  lg: 8,
+  xl: 12,
+  xxl: 16,
+  full: 9999,
+};
+
+export const fontSize = {
+  xs: 10,
+  sm: 12,
+  base: 14,
+  lg: 16,
+  xl: 18,
+  xxl: 24,
+};
+
+export const commonStyles = StyleSheet.create({
+  flex1: { flex: 1 },
+  flexRow: { flexDirection: 'row' },
+  flexRowCenter: { flexDirection: 'row', alignItems: 'center' },
+  itemsCenter: { alignItems: 'center' },
+  justifyCenter: { justifyContent: 'center' },
+  justifyBetween: { justifyContent: 'space-between' },
+  bgBackground: { backgroundColor: colors.background },
+  bgMuted: { backgroundColor: colors.muted },
+  bgCard: { backgroundColor: colors.card },
+  bgSuccess: { backgroundColor: colors.success },
+  bgDestructive: { backgroundColor: colors.destructive },
+  textForeground: { color: colors.foreground },
+  textMutedForeground: { color: colors.mutedForeground },
+  textSuccess: { color: colors.success },
+  textDestructive: { color: colors.destructive },
+  textWhite: { color: colors.white },
+  fontMono: { fontFamily: 'ChivoMono' },
+  fontMonoBold: { fontFamily: 'ChivoMono-Bold', fontWeight: '600' },
+  borderDefault: { borderWidth: 1, borderColor: colors.border },
+  roundedSm: { borderRadius: borderRadius.sm },
+  roundedMd: { borderRadius: borderRadius.md },
+  roundedLg: { borderRadius: borderRadius.lg },
+  roundedXl: { borderRadius: borderRadius.xl },
+  roundedFull: { borderRadius: borderRadius.full },
+});

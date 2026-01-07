@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Vibe Kanban",
+    "slug": "vibe-kanban",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "scheme": "vibekanban",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#282623"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vibekanban.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#282623"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.vibekanban.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#22c55e",
+          "sounds": []
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "vibe-kanban-mobile"
+      }
+    }
+  }
+}
