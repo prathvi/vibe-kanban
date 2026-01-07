@@ -16,6 +16,8 @@ import {
 } from '@/utils/statusLabels';
 import type { SharedTaskRecord } from '@/hooks/useProjectTasks';
 import { SharedTaskCard } from './SharedTaskCard';
+import { Button } from '@/components/ui/button';
+import { Play, Square } from 'lucide-react';
 
 export type KanbanColumnItem =
   | {
@@ -39,6 +41,9 @@ interface TaskKanbanBoardProps {
   selectedSharedTaskId?: string | null;
   onCreateTask?: () => void;
   projectId: string;
+  isQueueProcessing?: boolean;
+  onStartQueue?: () => void;
+  onStopQueue?: () => void;
 }
 
 function TaskKanbanBoard({
@@ -50,8 +55,32 @@ function TaskKanbanBoard({
   selectedSharedTaskId,
   onCreateTask,
   projectId,
+  isQueueProcessing,
+  onStartQueue,
+  onStopQueue,
 }: TaskKanbanBoardProps) {
   const { userId } = useAuth();
+
+  const queueActions = (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-xs"
+      onClick={isQueueProcessing ? onStopQueue : onStartQueue}
+    >
+      {isQueueProcessing ? (
+        <>
+          <Square className="h-3 w-3 mr-1" />
+          Stop
+        </>
+      ) : (
+        <>
+          <Play className="h-3 w-3 mr-1" />
+          Start
+        </>
+      )}
+    </Button>
+  );
 
   return (
     <KanbanProvider onDragEnd={onDragEnd}>
@@ -65,6 +94,7 @@ function TaskKanbanBoard({
               name={statusLabels[statusKey]}
               color={statusBoardColors[statusKey]}
               onAddTask={isQueueColumn ? undefined : onCreateTask}
+              actions={isQueueColumn ? queueActions : undefined}
             />
             <KanbanCards>
               {items.map((item, index) => {

@@ -82,6 +82,7 @@ import {
   SharedTaskResponse,
   SharedTaskDetails,
   QueueStatus,
+  QueueProcessingStatus,
   PrCommentsResponse,
   MergeTaskAttemptRequest,
   PushTaskAttemptRequest,
@@ -730,6 +731,25 @@ export const tasksApi = {
       body: JSON.stringify({ new_position: newPosition }),
     });
     return handleApiResponse<Task>(response);
+  },
+
+  getQueueStatus: async (projectId: string): Promise<QueueProcessingStatus> => {
+    const response = await makeRequest(
+      `/api/tasks/queue/status?project_id=${projectId}`
+    );
+    return handleApiResponse<QueueProcessingStatus>(response);
+  },
+
+  startQueueProcessing: async (
+    projectId: string
+  ): Promise<QueueProcessingStatus> => {
+    const response = await makeRequest(
+      `/api/tasks/queue/start?project_id=${projectId}`,
+      {
+        method: 'POST',
+      }
+    );
+    return handleApiResponse<QueueProcessingStatus>(response);
   },
 };
 

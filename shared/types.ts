@@ -346,7 +346,7 @@ export type ImportGitLabIssueResponse = { task: Task, issue: GitLabIssue, };
 
 export type GitLabConfigStatus = { has_project_url: boolean, has_token: boolean, project_url: string | null, sync_enabled: boolean, sync_labels: string | null, };
 
-export type VortexIssue = { id: string, key: string, title: string, description: string | null, type: string | null, status: string, priority: string | null, severity: string | null, assignee_id: string | null, reporter_id: string | null, labels: Array<string>, attachments: Array<VortexAttachment>, created_at: string, updated_at: string, };
+export type VortexIssue = { id: string, workspace_id: string | null, project_id: string | null, key: string, title: string, description: string | null, type: string | null, status: string, priority: string | null, severity: string | null, assignee_id: string | null, reporter_id: string | null, due_date: string | null, labels: Array<string>, custom_fields: string | null, customFields: any, componentIds: Array<string>, subtasks: any[], linkedIssues: any[], attachments: Array<VortexAttachment>, watcherIds: Array<string>, github_issue: any, created_at: string, updated_at: string, };
 
 export type VortexUser = { id: string, name: string, email: string, avatar_url: string | null, };
 
@@ -421,6 +421,8 @@ data: DraftFollowUpData,
 queued_at: string, };
 
 export type QueueStatus = { "status": "empty" } | { "status": "queued", message: QueuedMessage, };
+
+export type QueueProcessingStatus = { is_processing: boolean, current_task_id: string | null, queue_length: number, };
 
 export type ConflictOp = "rebase" | "merge" | "cherry_pick" | "revert";
 

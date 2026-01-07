@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'vibe-kanban',
-      cwd: '/Users/pratwirajpalekar/Apps/vibe-kanban',
+      cwd: '/home/ubuntu/vibe-kanban',
       script: './target/release/server',
       interpreter: 'none',
       env: {

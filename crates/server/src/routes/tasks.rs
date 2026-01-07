@@ -280,9 +280,14 @@ pub async fn update_task(
     let status_changing_to_in_progress =
         existing_task.status != TaskStatus::InProgress && status == TaskStatus::InProgress;
 
-    // Check if status is changing TO InReview (for Vortex sync)
+    // Check if status is changing TO InReview (for Vortex sync and queue progression)
     let status_changing_to_in_review =
         existing_task.status != TaskStatus::InReview && status == TaskStatus::InReview;
+
+    // Check if a sequential task is leaving InProgress (triggers next queue item)
+    let sequential_task_leaving_in_progress = existing_task.execution_mode == ExecutionMode::Sequential
+        && existing_task.status == TaskStatus::InProgress
+        && (status == TaskStatus::InReview || status == TaskStatus::Done || status == TaskStatus::Cancelled);
 
     let task = Task::update(
         &deployment.db().pool,
@@ -342,6 +347,17 @@ pub async fn update_task(
         }
     }
 
+    // Auto-start next task in queue when a sequential task leaves InProgress
+    if sequential_task_leaving_in_progress {
+        if let Err(e) = start_next_in_queue(&deployment, existing_task.project_id).await {
+            tracing::warn!(
+                "Failed to auto-start next task in queue for project {}: {}",
+                existing_task.project_id,
+                e
+            );
+        }
+    }
+
     // Re-fetch the task to get updated execution_mode and queue_position
     let task = Task::find_by_id(&deployment.db().pool, task.id)
         .await?
@@ -356,6 +372,58 @@ pub async fn update_task(
     }
 
     Ok(ResponseJson(ApiResponse::success(task)))
+}
+
+/// Start the next task in the sequential queue for a project
+async fn start_next_in_queue(deployment: &DeploymentImpl, project_id: Uuid) -> Result<(), ApiError> {
+    let pool = &deployment.db().pool;
+
+    // Check if there's already a sequential task in progress
+    if Task::has_running_sequential_task(pool, project_id).await? {
+        tracing::debug!(
+            "Sequential task already running for project {}, skipping queue progression",
+            project_id
+        );
+        return Ok(());
+    }
+
+    // Get the next task in the queue
+    let next_task = match Task::get_next_in_queue(pool, project_id).await? {
+        Some(task) => task,
+        None => {
+            tracing::debug!("No more tasks in queue for project {}", project_id);
+            return Ok(());
+        }
+    };
+
+    tracing::info!(
+        "Auto-starting next task in queue: {} ({})",
+        next_task.title,
+        next_task.id
+    );
+
+    // Update task status to in progress
+    Task::update_status(pool, next_task.id, TaskStatus::InProgress).await?;
+
+    // Fetch the updated task
+    let task = Task::find_by_id(pool, next_task.id)
+        .await?
+        .ok_or(ApiError::BadRequest("Task not found".to_string()))?;
+
+    // Auto-start the task
+    auto_start_task(deployment, &task).await?;
+
+    deployment
+        .track_if_analytics_allowed(
+            "queue_auto_progressed",
+            serde_json::json!({
+                "project_id": project_id.to_string(),
+                "task_id": task.id.to_string(),
+            }),
+        )
+        .await;
+
+    Ok(())
 }
 
 /// Auto-start a task by creating a workspace and starting the agent
@@ -722,6 +790,91 @@ pub async fn get_sequential_queue(
     Ok(ResponseJson(ApiResponse::success(tasks)))
 }
 
+#[derive(Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct QueueProcessingStatus {
+    pub is_processing: bool,
+    pub current_task_id: Option<Uuid>,
+    pub queue_length: usize,
+}
+
+/// Start processing the sequential queue for a project
+pub async fn start_queue_processing(
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<TaskQuery>,
+) -> Result<ResponseJson<ApiResponse<QueueProcessingStatus>>, ApiError> {
+    let pool = &deployment.db().pool;
+
+    // Check if there's already a sequential task in progress
+    if Task::has_running_sequential_task(pool, query.project_id).await? {
+        let queue = Task::find_sequential_queue_for_project(pool, query.project_id).await?;
+        let current = queue.iter().find(|t| t.status == TaskStatus::InProgress);
+        return Ok(ResponseJson(ApiResponse::success(QueueProcessingStatus {
+            is_processing: true,
+            current_task_id: current.map(|t| t.id),
+            queue_length: queue.len(),
+        })));
+    }
+
+    // Get the next task in the queue
+    let next_task = match Task::get_next_in_queue(pool, query.project_id).await? {
+        Some(task) => task,
+        None => {
+            return Ok(ResponseJson(ApiResponse::success(QueueProcessingStatus {
+                is_processing: false,
+                current_task_id: None,
+                queue_length: 0,
+            })));
+        }
+    };
+
+    // Update task status to in progress
+    Task::update_status(pool, next_task.id, TaskStatus::InProgress).await?;
+
+    // Fetch the updated task
+    let task = Task::find_by_id(pool, next_task.id)
+        .await?
+        .ok_or(ApiError::BadRequest("Task not found".to_string()))?;
+
+    // Auto-start the task
+    auto_start_task(&deployment, &task).await?;
+
+    let queue = Task::find_sequential_queue_for_project(pool, query.project_id).await?;
+
+    deployment
+        .track_if_analytics_allowed(
+            "queue_processing_started",
+            serde_json::json!({
+                "project_id": query.project_id.to_string(),
+                "task_id": task.id.to_string(),
+            }),
+        )
+        .await;
+
+    Ok(ResponseJson(ApiResponse::success(QueueProcessingStatus {
+        is_processing: true,
+        current_task_id: Some(task.id),
+        queue_length: queue.len(),
+    })))
+}
+
+/// Get queue processing status for a project
+pub async fn get_queue_status(
+    State(deployment): State<DeploymentImpl>,
+    Query(query): Query<TaskQuery>,
+) -> Result<ResponseJson<ApiResponse<QueueProcessingStatus>>, ApiError> {
+    let pool = &deployment.db().pool;
+    let queue = Task::find_sequential_queue_for_project(pool, query.project_id).await?;
+    let current = queue.iter().find(|t| t.status == TaskStatus::InProgress);
+    let is_processing = current.is_some();
+
+    Ok(ResponseJson(ApiResponse::success(QueueProcessingStatus {
+        is_processing,
+        current_task_id: current.map(|t| t.id),
+        queue_length: queue.len(),
+    })))
+}
+
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     let task_actions_router = Router::new()
         .route("/", put(update_task))
@@ -739,6 +892,8 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/stream/ws", get(stream_tasks_ws))
         .route("/create-and-start", post(create_task_and_start))
         .route("/queue", get(get_sequential_queue))
+        .route("/queue/status", get(get_queue_status))
+        .route("/queue/start", post(start_queue_processing))
         .nest("/{task_id}", task_id_router);
 
     // mount under /projects/:project_id/tasks

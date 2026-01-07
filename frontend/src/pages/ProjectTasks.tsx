@@ -145,6 +145,7 @@ export function ProjectTasks() {
   const [selectedSharedTaskId, setSelectedSharedTaskId] = useState<
     string | null
   >(null);
+  const [isQueueProcessing, setIsQueueProcessing] = useState(false);
   const { userId } = useAuth();
 
   const {
@@ -152,6 +153,32 @@ export function ProjectTasks() {
     isLoading: projectLoading,
     error: projectError,
   } = useProject();
+
+  // Fetch queue processing status on mount and when projectId changes
+  useEffect(() => {
+    if (!projectId) return;
+    tasksApi.getQueueStatus(projectId).then((status) => {
+      setIsQueueProcessing(status.is_processing);
+    }).catch((err) => {
+      console.error('Failed to fetch queue status:', err);
+    });
+  }, [projectId]);
+
+  const handleStartQueue = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const status = await tasksApi.startQueueProcessing(projectId);
+      setIsQueueProcessing(status.is_processing);
+    } catch (err) {
+      console.error('Failed to start queue:', err);
+    }
+  }, [projectId]);
+
+  const handleStopQueue = useCallback(() => {
+    // Stop is handled by completing/cancelling the current task
+    // This just updates the UI state
+    setIsQueueProcessing(false);
+  }, []);
 
   useEffect(() => {
     enableScope(Scope.KANBAN);
@@ -921,6 +948,9 @@ export function ProjectTasks() {
           selectedSharedTaskId={selectedSharedTaskId}
           onCreateTask={handleCreateNewTask}
           projectId={projectId!}
+          isQueueProcessing={isQueueProcessing}
+          onStartQueue={handleStartQueue}
+          onStopQueue={handleStopQueue}
         />
       </div>
     );
